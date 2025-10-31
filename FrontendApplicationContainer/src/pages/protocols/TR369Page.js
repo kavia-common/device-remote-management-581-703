@@ -37,6 +37,7 @@ import {
   Save as SaveIcon,
   FolderOpen as LoadIcon,
   Delete as DeleteIcon,
+  Help as HelpIcon,
 } from '@mui/icons-material';
 import { fetchDevices } from '../../store/slices/devicesSlice';
 import {
@@ -53,6 +54,7 @@ import {
 import { hasPermission } from '../../utils/permissions';
 import * as protocolsApi from '../../api/protocols';
 import useToast from '../../hooks/useToast';
+import MetadataDrawer from '../../components/MetadataDrawer';
 
 const operations = ['GET', 'SET'];
 
@@ -86,6 +88,9 @@ const TR369Page = () => {
   const [favoriteName, setFavoriteName] = useState('');
   const [favoriteDescription, setFavoriteDescription] = useState('');
   const [savingFavorite, setSavingFavorite] = useState(false);
+  
+  // Help drawer
+  const [helpDrawerOpen, setHelpDrawerOpen] = useState(false);
 
   // Realtime query status from Redux store
   const activeQuery = useSelector((state) =>
@@ -279,7 +284,17 @@ const TR369Page = () => {
             Execute TR369/USP operations: GET and SET
           </Typography>
         </Box>
-        {canReadFavorites && (
+        <Box>
+          <Tooltip title="Open help and parameter reference">
+            <IconButton
+              color="primary"
+              onClick={() => setHelpDrawerOpen(true)}
+              sx={{ mr: 1 }}
+            >
+              <HelpIcon />
+            </IconButton>
+          </Tooltip>
+          {canReadFavorites && (
           <Box>
             <Tooltip title="Save current query as favorite">
               <Button
@@ -301,7 +316,8 @@ const TR369Page = () => {
               </Button>
             </Tooltip>
           </Box>
-        )}
+          )}
+        </Box>
       </Box>
 
       <Grid container spacing={3}>
@@ -578,6 +594,13 @@ const TR369Page = () => {
           <Button onClick={() => setLoadDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Metadata Help Drawer */}
+      <MetadataDrawer
+        open={helpDrawerOpen}
+        onClose={() => setHelpDrawerOpen(false)}
+        protocol="TR369"
+      />
     </Box>
   );
 };

@@ -29,6 +29,7 @@ import {
   CloudUpload as UploadIcon,
   Logout as LogoutIcon,
   AccountCircle,
+  Help as HelpIcon,
 } from '@mui/icons-material';
 import { logoutUser, selectCurrentTenant } from '../store/slices/authSlice';
 import TenantSwitcher from './TenantSwitcher';
@@ -44,6 +45,7 @@ const menuItems = [
   { text: 'TR-369', icon: <StorageIcon />, path: '/protocols/tr369' },
   { text: 'Query History', icon: <HistoryIcon />, path: '/history' },
   { text: 'MIB Upload', icon: <UploadIcon />, path: '/config/mib' },
+  { text: 'Help', icon: <HelpIcon />, path: '/help' },
 ];
 
 // PUBLIC_INTERFACE

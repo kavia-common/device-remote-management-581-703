@@ -19,6 +19,7 @@ import TR369Page from './pages/protocols/TR369Page';
 import QueryHistory from './pages/QueryHistory';
 import MIBUpload from './pages/MIBUpload';
 import Unauthorized from './pages/Unauthorized';
+import Help from './pages/Help';
 
 // App shell providers
 import AppErrorBoundary from './components/AppErrorBoundary';
@@ -138,6 +139,14 @@ function App() {
                           element={
                             <ProtectedRoute>
                               <MIBUpload />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/help"
+                          element={
+                            <ProtectedRoute>
+                              <Help />
                             </ProtectedRoute>
                           }
                         />
