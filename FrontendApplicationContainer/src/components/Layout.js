@@ -17,6 +17,7 @@ import {
   Avatar,
   Menu,
   MenuItem,
+  Chip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -29,7 +30,8 @@ import {
   Logout as LogoutIcon,
   AccountCircle,
 } from '@mui/icons-material';
-import { logoutUser } from '../store/slices/authSlice';
+import { logoutUser, selectCurrentTenant } from '../store/slices/authSlice';
+import TenantSwitcher from './TenantSwitcher';
 
 const drawerWidth = 240;
 
@@ -55,6 +57,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const currentTenant = useSelector(selectCurrentTenant);
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -127,6 +130,24 @@ const Layout = ({ children }) => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Device Remote Management Platform
           </Typography>
+          
+          {/* Tenant Switcher */}
+          <TenantSwitcher />
+          
+          {/* Tenant Context Indicator (visible on larger screens) */}
+          {currentTenant && (
+            <Chip
+              label={`Tenant: ${currentTenant}`}
+              size="small"
+              sx={{
+                mx: 1,
+                display: { xs: 'none', md: 'flex' },
+                bgcolor: 'rgba(255, 255, 255, 0.15)',
+                color: 'inherit',
+              }}
+            />
+          )}
+          
           <IconButton
             size="large"
             aria-label="account of current user"

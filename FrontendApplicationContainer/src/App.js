@@ -26,7 +26,12 @@ import { ToastProvider } from './components/ToastProvider';
 import { RealtimeProvider } from './components/RealtimeProvider';
 
 // Create React Query client
-const queryClient = new QueryClient({
+// PUBLIC_INTERFACE
+/**
+ * Global React Query client instance
+ * Exported for use in components that need direct access to query client
+ */
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,

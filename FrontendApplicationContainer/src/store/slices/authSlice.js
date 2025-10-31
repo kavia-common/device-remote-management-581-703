@@ -75,6 +75,7 @@ export const fetchCurrentUser = createAsyncThunk(
 // Initial state
 const initialState = (() => {
   const storedUser = JSON.parse(localStorage.getItem('user')) || null;
+  const storedTenant = localStorage.getItem('currentTenant');
   return {
     user: storedUser,
     token: localStorage.getItem('token') || null,
@@ -84,7 +85,7 @@ const initialState = (() => {
     // RBAC fields with backward compatibility
     roles: storedUser?.roles || [],
     permissions: storedUser?.permissions || [],
-    currentTenant: storedUser?.currentTenant || null,
+    currentTenant: storedTenant || storedUser?.currentTenant || null,
   };
 })();
 
@@ -126,12 +127,18 @@ const authSlice = createSlice({
     },
     // PUBLIC_INTERFACE
     /**
-     * Update current tenant in the auth state
+     * Update current tenant in the auth state and persist to localStorage
      */
     setCurrentTenant: (state, action) => {
       state.currentTenant = action.payload;
       if (state.user) {
         state.user.currentTenant = action.payload;
+      }
+      // Persist to localStorage
+      if (action.payload) {
+        localStorage.setItem('currentTenant', action.payload);
+      } else {
+        localStorage.removeItem('currentTenant');
       }
     },
   },
@@ -180,6 +187,8 @@ const authSlice = createSlice({
         state.roles = [];
         state.permissions = [];
         state.currentTenant = null;
+        // Clear from localStorage
+        localStorage.removeItem('currentTenant');
       })
       // Fetch current user
       .addCase(fetchCurrentUser.pending, (state) => {

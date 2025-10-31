@@ -1,4 +1,5 @@
 import axios from 'axios';
+import store from '../store';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 const API_TIMEOUT = parseInt(process.env.REACT_APP_API_TIMEOUT || '30000', 10);
@@ -7,6 +8,7 @@ const API_TIMEOUT = parseInt(process.env.REACT_APP_API_TIMEOUT || '30000', 10);
 /**
  * Configured axios instance with JWT interceptors
  * Automatically adds authentication token to requests and handles token refresh
+ * Also injects X-Tenant-Id header when currentTenant is set
  */
 const axiosInstance = axios.create({
   baseURL: API_URL,
@@ -16,13 +18,21 @@ const axiosInstance = axios.create({
   },
 });
 
-// Request interceptor to add JWT token
+// Request interceptor to add JWT token and tenant header
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Inject X-Tenant-Id header if currentTenant is set
+    const state = store.getState();
+    const currentTenant = state.auth?.currentTenant;
+    if (currentTenant) {
+      config.headers['X-Tenant-Id'] = currentTenant;
+    }
+    
     return config;
   },
   (error) => {
