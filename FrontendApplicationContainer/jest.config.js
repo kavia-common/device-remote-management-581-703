@@ -7,7 +7,8 @@ module.exports = {
 
   // Map axios to its CJS build to avoid ESM import issues with Jest
   moduleNameMapper: {
-    '^axios$': '<rootDir>/node_modules/axios/dist/node/axios.cjs'
+    '^axios$': '<rootDir>/node_modules/axios/dist/node/axios.cjs',
+    '\\.(css|less|scss)$': 'identity-obj-proxy'
   },
 
   // Use babel-jest to transform JS/TS files so ESM/CJS interop works in Jest
