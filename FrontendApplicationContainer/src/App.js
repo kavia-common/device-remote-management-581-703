@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,23 +8,25 @@ import store from './store';
 import theme from './theme';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Devices from './pages/Devices';
-import SNMPPage from './pages/protocols/SNMPPage';
-import WebPAPage from './pages/protocols/WebPAPage';
-import TR69Page from './pages/protocols/TR69Page';
-import TR369Page from './pages/protocols/TR369Page';
-import QueryHistory from './pages/QueryHistory';
-import MIBUpload from './pages/MIBUpload';
-import Unauthorized from './pages/Unauthorized';
-import Help from './pages/Help';
 
 // App shell providers
 import AppErrorBoundary from './components/AppErrorBoundary';
 import { ToastProvider } from './components/ToastProvider';
 import { RealtimeProvider } from './components/RealtimeProvider';
+
+// Lazy-loaded route components for code splitting
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Devices = lazy(() => import('./pages/Devices'));
+const SNMPPage = lazy(() => import('./pages/protocols/SNMPPage'));
+const WebPAPage = lazy(() => import('./pages/protocols/WebPAPage'));
+const TR69Page = lazy(() => import('./pages/protocols/TR69Page'));
+const TR369Page = lazy(() => import('./pages/protocols/TR369Page'));
+const QueryHistory = lazy(() => import('./pages/QueryHistory'));
+const MIBUpload = lazy(() => import('./pages/MIBUpload'));
+const Unauthorized = lazy(() => import('./pages/Unauthorized'));
+const Help = lazy(() => import('./pages/Help'));
 
 // Create React Query client
 // PUBLIC_INTERFACE
@@ -42,6 +44,11 @@ export const queryClient = new QueryClient({
   },
 });
 
+// PUBLIC_INTERFACE
+/**
+ * Minimal skeleton/fallback component displayed while route components are loading
+ * Provides visual feedback during lazy loading
+ */
 function FallbackSkeleton() {
   return (
     <div style={{ padding: 16 }}>
@@ -58,6 +65,7 @@ function FallbackSkeleton() {
  * Main App component
  * Configures routing, Redux store, React Query, and Material-UI theme
  * Now wrapped with AppErrorBoundary, ToastProvider, RealtimeProvider, and React.Suspense
+ * All major routes are lazy-loaded for optimal bundle size and performance
  */
 function App() {
   return (
@@ -72,12 +80,12 @@ function App() {
                   <Layout>
                     <Suspense fallback={<FallbackSkeleton />}>
                       <Routes>
-                        {/* Public routes */}
+                        {/* Public routes - lazy loaded */}
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
                         <Route path="/unauthorized" element={<Unauthorized />} />
 
-                        {/* Protected routes */}
+                        {/* Protected routes - lazy loaded */}
                         <Route
                           path="/dashboard"
                           element={
