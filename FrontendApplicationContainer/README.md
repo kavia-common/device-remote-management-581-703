@@ -115,10 +115,51 @@ The build files will be in the `build/` directory.
 
 ### Testing
 
+#### Unit & Integration Tests
+
 Run the test suite:
 ```bash
 npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
 ```
+
+#### End-to-End (E2E) Tests
+
+E2E tests are written using Playwright and cover critical user flows.
+
+```bash
+# Install Playwright browsers (first time only)
+npx playwright install chromium
+
+# Run E2E tests
+npm run e2e
+
+# Run E2E tests in UI mode (interactive)
+npm run e2e:ui
+
+# Run E2E tests in CI mode
+npm run e2e:ci
+
+# View E2E test report
+npm run e2e:report
+```
+
+**E2E Test Coverage:**
+- Login flow with valid/invalid credentials
+- Device search with debounce validation
+- Protocol query execution (SNMP, WebPA, TR69, TR369)
+- Realtime updates via SSE
+- Favorites management
+- Query cancellation
+
+For detailed E2E testing documentation, see:
+- `e2e/README.md` - Complete E2E testing guide
+- `E2E_QUICK_REFERENCE.md` - Quick reference for common tasks
 
 ## Environment Variables
 
