@@ -51,10 +51,28 @@ export const fetchQueryResults = createAsyncThunk(
   }
 );
 
+// PUBLIC_INTERFACE
+/**
+ * Cancel a running query
+ * Posts to /queries/:jobId/cancel with proper authentication and tenant headers
+ */
+export const cancelQuery = createAsyncThunk(
+  'queries/cancel',
+  async (jobId, { rejectWithValue }) => {
+    try {
+      const response = await protocolsApi.cancelQuery(jobId);
+      return { jobId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: 'Failed to cancel query' });
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   history: [],
   activeQueries: {},
+  cancellingQueries: {}, // Track queries being cancelled
   results: {},
   pagination: {
     page: 1,
@@ -253,6 +271,36 @@ const queriesSlice = createSlice({
       .addCase(fetchQueryResults.fulfilled, (state, action) => {
         const jobId = action.meta.arg;
         state.results[jobId] = action.payload;
+      })
+      // Cancel query
+      .addCase(cancelQuery.pending, (state, action) => {
+        const jobId = action.meta.arg;
+        state.cancellingQueries[jobId] = true;
+      })
+      .addCase(cancelQuery.fulfilled, (state, action) => {
+        const { jobId } = action.payload;
+        delete state.cancellingQueries[jobId];
+        
+        // Update active query status
+        if (state.activeQueries[jobId]) {
+          state.activeQueries[jobId].status = 'cancelled';
+          state.activeQueries[jobId].cancelledAt = new Date().toISOString();
+        }
+        
+        // Update history
+        const historyIndex = state.history.findIndex(q => q.jobId === jobId);
+        if (historyIndex >= 0) {
+          state.history[historyIndex] = {
+            ...state.history[historyIndex],
+            status: 'cancelled',
+            cancelledAt: new Date().toISOString(),
+          };
+        }
+      })
+      .addCase(cancelQuery.rejected, (state, action) => {
+        const jobId = action.meta.arg;
+        delete state.cancellingQueries[jobId];
+        state.error = action.payload?.message || 'Failed to cancel query';
       });
   },
 });
@@ -284,6 +332,24 @@ export const selectQueryResultsById = (jobId) => (state) =>
  * Select realtime connection status
  */
 export const selectRealtimeConnected = (state) => state.queries.realtimeConnected;
+
+// PUBLIC_INTERFACE
+/**
+ * Check if a query is being cancelled
+ */
+export const selectIsQueryCancelling = (jobId) => (state) =>
+  state.queries.cancellingQueries[jobId] || false;
+
+// PUBLIC_INTERFACE
+/**
+ * Check if a query can be cancelled (is in flight)
+ */
+export const selectCanCancelQuery = (jobId) => (state) => {
+  const query = state.queries.activeQueries[jobId];
+  if (!query) return false;
+  const inFlightStatuses = ['pending', 'processing', 'running'];
+  return inFlightStatuses.includes(query.status);
+};
 
 export const { 
   clearError, 

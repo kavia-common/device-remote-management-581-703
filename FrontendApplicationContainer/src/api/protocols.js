@@ -149,3 +149,15 @@ export const getQueryHistory = async (params = {}) => {
   const response = await axiosInstance.get('/queries/history', { params });
   return response.data;
 };
+
+// PUBLIC_INTERFACE
+/**
+ * Cancel a running query
+ * Posts to /queries/:jobId/cancel with proper authentication and tenant headers
+ * @param {string} jobId - Job ID to cancel
+ * @returns {Promise<Object>} Cancellation result
+ */
+export const cancelQuery = async (jobId) => {
+  const response = await axiosInstance.post(`/queries/${jobId}/cancel`);
+  return response.data;
+};
