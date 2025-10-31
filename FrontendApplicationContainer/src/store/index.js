@@ -1,25 +1,17 @@
 import { configureStore } from '@reduxjs/toolkit';
-import authReducer from './slices/authSlice';
-import devicesReducer from './slices/devicesSlice';
-import queriesReducer from './slices/queriesSlice';
+import auth from './slices/authSlice';
+import devices from './slices/devicesSlice';
+import queries from './slices/queriesSlice';
 
 // PUBLIC_INTERFACE
-/**
- * Redux store configuration
- */
+/** Redux store configuration with slices */
 const store = configureStore({
   reducer: {
-    auth: authReducer,
-    devices: devicesReducer,
-    queries: queriesReducer,
+    auth,
+    devices,
+    queries,
   },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: {
-        // Ignore these action types for serializable check
-        ignoredActions: ['queries/addActiveQuery'],
-      },
-    }),
 });
 
 export default store;
+export { store };

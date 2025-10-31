@@ -1,70 +1,47 @@
-import axiosInstance from './axios';
+import api from './axios';
 
 // PUBLIC_INTERFACE
 /**
- * Get all devices for current user
- * @param {Object} params - Query parameters
- * @param {number} params.page - Page number
- * @param {number} params.pageSize - Items per page
- * @param {string} params.sort - Sort field and direction
- * @returns {Promise<Object>} Paginated device list
+ * Search devices with pagination.
+ * Returns: { items, page, pageSize, totalPages, totalItems, hasNext, hasPrevious }
  */
 export const getDevices = async (params = {}) => {
-  const response = await axiosInstance.get('/devices', { params });
-  return response.data;
+  const { data } = await api.get('/devices', { params });
+  return data;
 };
 
 // PUBLIC_INTERFACE
-/**
- * Get device by ID
- * @param {string} deviceId - Device ID
- * @returns {Promise<Object>} Device details
- */
-export const getDevice = async (deviceId) => {
-  const response = await axiosInstance.get(`/devices/${deviceId}`);
-  return response.data;
+/** Get device details. Returns: { device } */
+export const getDevice = async (id) => {
+  const { data } = await api.get(`/devices/${id}`);
+  return data;
 };
 
 // PUBLIC_INTERFACE
-/**
- * Create new device
- * @param {Object} deviceData - Device data
- * @returns {Promise<Object>} Created device
- */
-export const createDevice = async (deviceData) => {
-  const response = await axiosInstance.post('/devices', deviceData);
-  return response.data;
+/** Cancel an ongoing job by jobId. Returns backend cancel response. */
+export const cancelJob = async (jobId) => {
+  const { data } = await api.post(`/jobs/${jobId}/cancel`);
+  return data;
 };
 
 // PUBLIC_INTERFACE
-/**
- * Update device
- * @param {string} deviceId - Device ID
- * @param {Object} deviceData - Updated device data
- * @returns {Promise<Object>} Updated device
- */
-export const updateDevice = async (deviceId, deviceData) => {
-  const response = await axiosInstance.put(`/devices/${deviceId}`, deviceData);
-  return response.data;
-};
-
-// PUBLIC_INTERFACE
-/**
- * Delete device
- * @param {string} deviceId - Device ID
- * @returns {Promise<void>}
- */
-export const deleteDevice = async (deviceId) => {
-  const response = await axiosInstance.delete(`/devices/${deviceId}`);
-  return response.data;
-};
-
-// PUBLIC_INTERFACE
-/**
- * Get device statistics
- * @returns {Promise<Object>} Device statistics
- */
+/** Stats helper if backend supports it. */
 export const getDeviceStats = async () => {
-  const response = await axiosInstance.get('/devices/stats');
-  return response.data;
+  const { data } = await api.get('/devices/stats');
+  return data;
+};
+
+// PUBLIC_INTERFACE
+/** CRUD helpers if needed by UI (kept for compatibility) */
+export const createDevice = async (deviceData) => {
+  const { data } = await api.post('/devices', deviceData);
+  return data;
+};
+export const updateDevice = async (deviceId, deviceData) => {
+  const { data } = await api.put(`/devices/${deviceId}`, deviceData);
+  return data;
+};
+export const deleteDevice = async (deviceId) => {
+  const { data } = await api.delete(`/devices/${deviceId}`);
+  return data;
 };

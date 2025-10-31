@@ -1,317 +1,102 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import * as authApi from '../../api/auth';
+import { login as apiLogin, getCurrentUser as apiMe, logout as logoutApi } from '../../api/auth';
 
-// Async thunks
-
-// PUBLIC_INTERFACE
-/**
- * Login user async thunk
- */
-export const loginUser = createAsyncThunk(
-  'auth/login',
-  async (credentials, { rejectWithValue }) => {
-    try {
-      const response = await authApi.login(credentials);
-      // Store token and user in localStorage
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || { message: 'Login failed' });
-    }
-  }
-);
+const normalizeError = (err) => err?.error ? err : { error: { code: 'CLIENT', message: 'Request failed', timestamp: new Date().toISOString() } };
 
 // PUBLIC_INTERFACE
-/**
- * Register user async thunk
- */
-export const registerUser = createAsyncThunk(
-  'auth/register',
-  async (userData, { rejectWithValue }) => {
-    try {
-      const response = await authApi.register(userData);
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || { message: 'Registration failed' });
-    }
+export const loginUser = createAsyncThunk('auth/login', async ({ email, password }, { rejectWithValue }) => {
+  try {
+    const data = await apiLogin({ email, password });
+    return data;
+  } catch (err) {
+    return rejectWithValue(normalizeError(err));
   }
-);
+});
 
 // PUBLIC_INTERFACE
-/**
- * Logout user async thunk
- */
-export const logoutUser = createAsyncThunk(
-  'auth/logout',
-  async (_, { rejectWithValue }) => {
-    try {
-      await authApi.logout();
-      return null;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || { message: 'Logout failed' });
-    }
+export const fetchCurrentUser = createAsyncThunk('auth/me', async (_, { rejectWithValue }) => {
+  try {
+    const data = await apiMe();
+    return data;
+  } catch (err) {
+    return rejectWithValue(normalizeError(err));
   }
-);
+});
 
 // PUBLIC_INTERFACE
-/**
- * Fetch current user data including roles and permissions from /auth/me endpoint
- */
-export const fetchCurrentUser = createAsyncThunk(
-  'auth/fetchCurrentUser',
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await authApi.getCurrentUser();
-      // Update localStorage with fresh user data
-      localStorage.setItem('user', JSON.stringify(response.user || response));
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || { message: 'Failed to fetch user data' });
-    }
-  }
-);
+export const logoutUser = createAsyncThunk('auth/logout', async () => {
+  try { await logoutApi(); } catch { /* ignore */ }
+  return true;
+});
 
-// Initial state
-const initialState = (() => {
-  const storedUser = JSON.parse(localStorage.getItem('user')) || null;
-  const storedTenant = localStorage.getItem('currentTenant');
-  return {
-    user: storedUser,
-    token: localStorage.getItem('token') || null,
-    isAuthenticated: !!localStorage.getItem('token'),
-    loading: false,
-    error: null,
-    // RBAC fields with backward compatibility
-    roles: storedUser?.roles || [],
-    permissions: storedUser?.permissions || [],
-    currentTenant: storedTenant || storedUser?.currentTenant || null,
-  };
-})();
-
-// Slice
-const authSlice = createSlice({
+const slice = createSlice({
   name: 'auth',
-  initialState,
+  initialState: {
+    user: JSON.parse(localStorage.getItem('user')) || null,
+    token: localStorage.getItem('token') || null,
+    currentTenant: localStorage.getItem('currentTenant') || localStorage.getItem('tenantId') || null,
+    status: 'idle',
+    error: null,
+    isAuthenticated: !!localStorage.getItem('token'),
+  },
   reducers: {
-    clearError: (state) => {
+    // PUBLIC_INTERFACE
+    setTenant(state, action) {
+      state.currentTenant = action.payload || null;
+      if (action.payload) localStorage.setItem('currentTenant', action.payload);
+      else localStorage.removeItem('currentTenant');
+    },
+    // PUBLIC_INTERFACE
+    setToken(state, action) {
+      state.token = action.payload || null;
+      if (action.payload) localStorage.setItem('token', action.payload);
+      else localStorage.removeItem('token');
+    },
+    // PUBLIC_INTERFACE
+    clearError(state) {
       state.error = null;
-    },
-    setUser: (state, action) => {
-      state.user = action.payload;
-      state.isAuthenticated = true;
-      // Update RBAC fields from user data
-      state.roles = action.payload?.roles || [];
-      state.permissions = action.payload?.permissions || [];
-      state.currentTenant = action.payload?.currentTenant || null;
-    },
-    // PUBLIC_INTERFACE
-    /**
-     * Update roles in the auth state
-     */
-    setRoles: (state, action) => {
-      state.roles = action.payload || [];
-      if (state.user) {
-        state.user.roles = action.payload || [];
-      }
-    },
-    // PUBLIC_INTERFACE
-    /**
-     * Update permissions in the auth state
-     */
-    setPermissions: (state, action) => {
-      state.permissions = action.payload || [];
-      if (state.user) {
-        state.user.permissions = action.payload || [];
-      }
-    },
-    // PUBLIC_INTERFACE
-    /**
-     * Update current tenant in the auth state and persist to localStorage
-     */
-    setCurrentTenant: (state, action) => {
-      state.currentTenant = action.payload;
-      if (state.user) {
-        state.user.currentTenant = action.payload;
-      }
-      // Persist to localStorage
-      if (action.payload) {
-        localStorage.setItem('currentTenant', action.payload);
-      } else {
-        localStorage.removeItem('currentTenant');
-      }
-    },
+    }
   },
   extraReducers: (builder) => {
     builder
-      // Login
       .addCase(loginUser.pending, (state) => {
-        state.loading = true;
+        state.status = 'loading';
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
-        state.loading = false;
-        state.isAuthenticated = true;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.error = null;
-        // Extract RBAC fields with backward compatibility
-        state.roles = action.payload.user?.roles || [];
-        state.permissions = action.payload.user?.permissions || [];
-        state.currentTenant = action.payload.user?.currentTenant || null;
+        state.status = 'succeeded';
+        state.user = action.payload.user || null;
+        state.token = action.payload.token || null;
+        state.isAuthenticated = !!action.payload.token;
+        if (action.payload.token) localStorage.setItem('token', action.payload.token);
+        if (action.payload.user) localStorage.setItem('user', JSON.stringify(action.payload.user));
       })
       .addCase(loginUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload?.message || 'Login failed';
+        state.status = 'failed';
+        state.error = action.payload?.error || action.error;
       })
-      // Register
-      .addCase(registerUser.pending, (state) => {
-        state.loading = true;
-        state.error = null;
+      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+        const user = action.payload.user || action.payload || null;
+        state.user = user;
+        if (user) localStorage.setItem('user', JSON.stringify(user));
       })
-      .addCase(registerUser.fulfilled, (state) => {
-        state.loading = false;
-        state.error = null;
-      })
-      .addCase(registerUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload?.message || 'Registration failed';
-      })
-      // Logout
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
-        state.loading = false;
+        state.status = 'idle';
         state.error = null;
-        state.roles = [];
-        state.permissions = [];
-        state.currentTenant = null;
-        // Clear from localStorage
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('tenantId');
         localStorage.removeItem('currentTenant');
-      })
-      // Fetch current user
-      .addCase(fetchCurrentUser.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
-        state.loading = false;
-        const userData = action.payload.user || action.payload;
-        state.user = userData;
-        state.roles = userData?.roles || [];
-        state.permissions = userData?.permissions || [];
-        state.currentTenant = userData?.currentTenant || null;
-        state.error = null;
-      })
-      .addCase(fetchCurrentUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload?.message || 'Failed to fetch user data';
       });
   },
 });
 
-// Selectors
+export const { setTenant, setToken, clearError } = slice.actions;
+export default slice.reducer;
 
 // PUBLIC_INTERFACE
-/**
- * Select the current user
- */
-export const selectUser = (state) => state.auth.user;
-
-// PUBLIC_INTERFACE
-/**
- * Select authentication status
- */
-export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
-
-// PUBLIC_INTERFACE
-/**
- * Select user roles
- */
-export const selectRoles = (state) => state.auth.roles || [];
-
-// PUBLIC_INTERFACE
-/**
- * Select user permissions
- */
-export const selectPermissions = (state) => state.auth.permissions || [];
-
-// PUBLIC_INTERFACE
-/**
- * Select current tenant
- */
+/** Select current tenant identifier */
 export const selectCurrentTenant = (state) => state.auth.currentTenant;
-
-// PUBLIC_INTERFACE
-/**
- * Check if user has a specific role
- * @param {string} role - Role to check
- * @returns {Function} Selector function
- */
-export const selectHasRole = (role) => (state) => {
-  const roles = state.auth.roles || [];
-  return roles.includes(role);
-};
-
-// PUBLIC_INTERFACE
-/**
- * Check if user has any of the specified roles
- * @param {string[]} requiredRoles - Array of roles to check
- * @returns {Function} Selector function
- */
-export const selectHasAnyRole = (requiredRoles = []) => (state) => {
-  if (!requiredRoles || requiredRoles.length === 0) return true;
-  const roles = state.auth.roles || [];
-  return requiredRoles.some(role => roles.includes(role));
-};
-
-// PUBLIC_INTERFACE
-/**
- * Check if user has all of the specified roles
- * @param {string[]} requiredRoles - Array of roles to check
- * @returns {Function} Selector function
- */
-export const selectHasAllRoles = (requiredRoles = []) => (state) => {
-  if (!requiredRoles || requiredRoles.length === 0) return true;
-  const roles = state.auth.roles || [];
-  return requiredRoles.every(role => roles.includes(role));
-};
-
-// PUBLIC_INTERFACE
-/**
- * Check if user has a specific permission
- * @param {string} permission - Permission to check
- * @returns {Function} Selector function
- */
-export const selectHasPermission = (permission) => (state) => {
-  const permissions = state.auth.permissions || [];
-  return permissions.includes(permission);
-};
-
-// PUBLIC_INTERFACE
-/**
- * Check if user has any of the specified permissions
- * @param {string[]} requiredPermissions - Array of permissions to check
- * @returns {Function} Selector function
- */
-export const selectHasAnyPermission = (requiredPermissions = []) => (state) => {
-  if (!requiredPermissions || requiredPermissions.length === 0) return true;
-  const permissions = state.auth.permissions || [];
-  return requiredPermissions.some(permission => permissions.includes(permission));
-};
-
-// PUBLIC_INTERFACE
-/**
- * Check if user has all of the specified permissions
- * @param {string[]} requiredPermissions - Array of permissions to check
- * @returns {Function} Selector function
- */
-export const selectHasAllPermissions = (requiredPermissions = []) => (state) => {
-  if (!requiredPermissions || requiredPermissions.length === 0) return true;
-  const permissions = state.auth.permissions || [];
-  return requiredPermissions.every(permission => permissions.includes(permission));
-};
-
-export const { clearError, setUser, setRoles, setPermissions, setCurrentTenant } = authSlice.actions;
-export default authSlice.reducer;

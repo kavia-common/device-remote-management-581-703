@@ -1,54 +1,41 @@
-import axiosInstance from './axios';
+import api from './axios';
 
 // PUBLIC_INTERFACE
-/**
- * User login
- * @param {Object} credentials - User credentials
- * @param {string} credentials.email - User email
- * @param {string} credentials.password - User password
- * @returns {Promise<Object>} Login response with token and user data
- */
-export const login = async (credentials) => {
-  const response = await axiosInstance.post('/auth/login', credentials);
-  return response.data;
+/** Perform login and obtain JWT token. Returns: { token, user, expiresIn } */
+export const login = async ({ email, password }) => {
+  const { data } = await api.post('/auth/login', { email, password });
+  return data;
 };
 
 // PUBLIC_INTERFACE
-/**
- * User registration
- * @param {Object} userData - User registration data
- * @param {string} userData.email - User email
- * @param {string} userData.password - User password
- * @param {string} userData.name - User full name
- * @returns {Promise<Object>} Registration response
- */
-export const register = async (userData) => {
-  const response = await axiosInstance.post('/auth/register', userData);
-  return response.data;
+/** Register a new user. Returns: { user, message } */
+export const register = async (payload) => {
+  const { data } = await api.post('/auth/register', payload);
+  return data;
 };
 
 // PUBLIC_INTERFACE
-/**
- * User logout
- * @returns {Promise<void>}
- */
+/** Retrieve current user profile. Returns: { user } */
+export const getCurrentUser = async () => {
+  const { data } = await api.get('/auth/me');
+  return data;
+};
+
+// PUBLIC_INTERFACE
+/** Refresh token. Returns: { token, expiresIn } */
+export const refresh = async () => {
+  const { data } = await api.post('/auth/refresh');
+  return data;
+};
+
+// PUBLIC_INTERFACE
+/** Logout: invalidate server session if supported. */
 export const logout = async () => {
   try {
-    await axiosInstance.post('/auth/logout');
-  } catch (error) {
-    console.error('Logout error:', error);
+    await api.post('/auth/logout');
+  } catch {
+    // ignore
   } finally {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
   }
-};
-
-// PUBLIC_INTERFACE
-/**
- * Get current user profile
- * @returns {Promise<Object>} User profile data
- */
-export const getCurrentUser = async () => {
-  const response = await axiosInstance.get('/auth/me');
-  return response.data;
 };
