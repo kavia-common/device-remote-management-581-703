@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Box,
@@ -22,25 +22,96 @@ import {
   TextField,
   MenuItem,
   Tooltip,
+  InputAdornment,
 } from '@mui/material';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Add as AddIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon,
 } from '@mui/icons-material';
 import { fetchDevices, createDevice, updateDevice, deleteDevice } from '../store/slices/devicesSlice';
 import { selectHasPermission } from '../store/slices/authSlice';
 import { WithPermission } from '../components/withPermission';
 import { PERMISSIONS } from '../utils/permissions';
 import useToast from '../hooks/useToast';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 
 const protocols = ['SNMP', 'WebPA', 'TR69', 'TR369'];
+
+// Memoized device row component for better performance
+const DeviceRow = React.memo(({ device, onEdit, onDelete, canWriteDevice, canDeleteDevice }) => (
+  <TableRow>
+    <TableCell>{device.name}</TableCell>
+    <TableCell>{device.ipAddress}</TableCell>
+    <TableCell>
+      <Chip label={device.protocol} size="small" color="primary" />
+    </TableCell>
+    <TableCell>
+      <Chip
+        label={device.status || 'active'}
+        size="small"
+        color={device.status === 'active' ? 'success' : 'default'}
+      />
+    </TableCell>
+    <TableCell>{device.description}</TableCell>
+    <TableCell align="right">
+      {/* Gate Edit button behind device:write permission */}
+      <WithPermission
+        requiredPermissions={[PERMISSIONS.DEVICE_WRITE]}
+        fallback={
+          <Tooltip title="You don't have permission to edit devices">
+            <span>
+              <IconButton size="small" color="primary" disabled>
+                <EditIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+        }
+      >
+        <IconButton
+          size="small"
+          color="primary"
+          onClick={() => onEdit(device)}
+        >
+          <EditIcon />
+        </IconButton>
+      </WithPermission>
+      
+      {/* Gate Delete button behind device:delete permission */}
+      <WithPermission
+        requiredPermissions={[PERMISSIONS.DEVICE_DELETE]}
+        fallback={
+          <Tooltip title="You don't have permission to delete devices">
+            <span>
+              <IconButton size="small" color="error" disabled>
+                <DeleteIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+        }
+      >
+        <IconButton
+          size="small"
+          color="error"
+          onClick={() => onDelete(device.id)}
+        >
+          <DeleteIcon />
+        </IconButton>
+      </WithPermission>
+    </TableCell>
+  </TableRow>
+));
+
+DeviceRow.displayName = 'DeviceRow';
 
 // PUBLIC_INTERFACE
 /**
  * Devices page component
- * Displays device list with CRUD operations
+ * Displays device list with CRUD operations and search functionality
  * Implements RBAC for device write and delete operations
+ * Uses debounced search to optimize network calls
  */
 const Devices = () => {
   const dispatch = useDispatch();
@@ -53,6 +124,7 @@ const Devices = () => {
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
+  const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState(null);
   const [formData, setFormData] = useState({
@@ -62,20 +134,45 @@ const Devices = () => {
     description: '',
   });
 
+  // Debounce search term with 300ms delay for responsive typing
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
+
+  // Fetch devices when debounced search term, page, or rowsPerPage changes
   useEffect(() => {
-    dispatch(fetchDevices({ page: page + 1, pageSize: rowsPerPage }));
-  }, [dispatch, page, rowsPerPage]);
+    const params = { 
+      page: page + 1, 
+      pageSize: rowsPerPage,
+    };
+    
+    // Add search parameter if search term is present
+    if (debouncedSearchTerm.trim()) {
+      params.search = debouncedSearchTerm.trim();
+    }
+    
+    dispatch(fetchDevices(params));
+  }, [dispatch, page, rowsPerPage, debouncedSearchTerm]);
 
-  const handleChangePage = (event, newPage) => {
+  // Memoized handlers
+  const handleChangePage = useCallback((event, newPage) => {
     setPage(newPage);
-  };
+  }, []);
 
-  const handleChangeRowsPerPage = (event) => {
+  const handleChangeRowsPerPage = useCallback((event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
-  };
+  }, []);
 
-  const handleOpenDialog = (device = null) => {
+  const handleSearchChange = useCallback((event) => {
+    setSearchTerm(event.target.value);
+    setPage(0); // Reset to first page on search
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchTerm('');
+    setPage(0);
+  }, []);
+
+  const handleOpenDialog = useCallback((device = null) => {
     if (device) {
       setEditingDevice(device);
       setFormData({
@@ -94,21 +191,21 @@ const Devices = () => {
       });
     }
     setDialogOpen(true);
-  };
+  }, []);
 
-  const handleCloseDialog = () => {
+  const handleCloseDialog = useCallback(() => {
     setDialogOpen(false);
     setEditingDevice(null);
-  };
+  }, []);
 
-  const handleFormChange = (e) => {
-    setFormData({
-      ...formData,
+  const handleFormChange = useCallback((e) => {
+    setFormData((prev) => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    });
-  };
+    }));
+  }, []);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     try {
       if (editingDevice) {
         await dispatch(updateDevice({ deviceId: editingDevice.id, deviceData: formData })).unwrap();
@@ -122,9 +219,9 @@ const Devices = () => {
     } catch (error) {
       showToast(error.message || 'Operation failed', { type: 'error' });
     }
-  };
+  }, [editingDevice, formData, dispatch, showToast, handleCloseDialog, page, rowsPerPage]);
 
-  const handleDelete = async (deviceId) => {
+  const handleDelete = useCallback(async (deviceId) => {
     if (window.confirm('Are you sure you want to delete this device?')) {
       try {
         await dispatch(deleteDevice(deviceId)).unwrap();
@@ -134,7 +231,12 @@ const Devices = () => {
         showToast(error.message || 'Failed to delete device', { type: 'error' });
       }
     }
-  };
+  }, [dispatch, showToast, page, rowsPerPage]);
+
+  // Memoize filtered devices for performance
+  const displayedDevices = useMemo(() => {
+    return devices || [];
+  }, [devices]);
 
   if (loading && devices.length === 0) {
     return (
@@ -175,6 +277,35 @@ const Devices = () => {
         </WithPermission>
       </Box>
 
+      {/* Search bar */}
+      <Box mb={2}>
+        <TextField
+          fullWidth
+          placeholder="Search devices by name, IP address, or protocol..."
+          value={searchTerm}
+          onChange={handleSearchChange}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm && (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  onClick={handleClearSearch}
+                  edge="end"
+                  aria-label="clear search"
+                >
+                  <ClearIcon />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -188,72 +319,22 @@ const Devices = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {devices.map((device) => (
-              <TableRow key={device.id}>
-                <TableCell>{device.name}</TableCell>
-                <TableCell>{device.ipAddress}</TableCell>
-                <TableCell>
-                  <Chip label={device.protocol} size="small" color="primary" />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={device.status || 'active'}
-                    size="small"
-                    color={device.status === 'active' ? 'success' : 'default'}
-                  />
-                </TableCell>
-                <TableCell>{device.description}</TableCell>
-                <TableCell align="right">
-                  {/* Gate Edit button behind device:write permission */}
-                  <WithPermission
-                    requiredPermissions={[PERMISSIONS.DEVICE_WRITE]}
-                    fallback={
-                      <Tooltip title="You don't have permission to edit devices">
-                        <span>
-                          <IconButton size="small" color="primary" disabled>
-                            <EditIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    }
-                  >
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={() => handleOpenDialog(device)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                  </WithPermission>
-                  
-                  {/* Gate Delete button behind device:delete permission */}
-                  <WithPermission
-                    requiredPermissions={[PERMISSIONS.DEVICE_DELETE]}
-                    fallback={
-                      <Tooltip title="You don't have permission to delete devices">
-                        <span>
-                          <IconButton size="small" color="error" disabled>
-                            <DeleteIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    }
-                  >
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(device.id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </WithPermission>
-                </TableCell>
-              </TableRow>
+            {displayedDevices.map((device) => (
+              <DeviceRow
+                key={device.id}
+                device={device}
+                onEdit={handleOpenDialog}
+                onDelete={handleDelete}
+                canWriteDevice={canWriteDevice}
+                canDeleteDevice={canDeleteDevice}
+              />
             ))}
-            {devices.length === 0 && (
+            {displayedDevices.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} align="center">
-                  No devices found. Click &quot;Add Device&quot; to create one.
+                  {searchTerm 
+                    ? `No devices found matching "${searchTerm}"`
+                    : 'No devices found. Click "Add Device" to create one.'}
                 </TableCell>
               </TableRow>
             )}
