@@ -97,15 +97,15 @@ const Register = () => {
           alignItems: 'center',
         }}
       >
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-          <Typography component="h1" variant="h4" align="center" gutterBottom>
+        <Paper elevation={3} sx={{ p: 4, width: '100%' }} role="region" aria-labelledby="register-heading">
+          <Typography id="register-heading" component="h1" variant="h4" align="center" gutterBottom>
             Device Remote Management
           </Typography>
           <Typography component="h2" variant="h5" align="center" gutterBottom>
             Sign Up
           </Typography>
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }} aria-label="Registration form">
             <TextField
               margin="normal"
               required

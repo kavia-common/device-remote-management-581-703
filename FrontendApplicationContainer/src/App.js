@@ -13,6 +13,7 @@ import Layout from './components/Layout';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import { ToastProvider } from './components/ToastProvider';
 import { RealtimeProvider } from './components/RealtimeProvider';
+import StatusAnnouncer from './components/StatusAnnouncer';
 
 // Lazy-loaded route components for code splitting
 const Login = lazy(() => import('./pages/Login'));
@@ -76,6 +77,7 @@ function App() {
           <AppErrorBoundary>
             <ToastProvider>
               <RealtimeProvider>
+                <StatusAnnouncer />
                 <Router>
                   <Layout>
                     <Suspense fallback={<FallbackSkeleton />}>

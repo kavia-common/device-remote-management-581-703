@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -51,6 +51,7 @@ const menuItems = [
 // PUBLIC_INTERFACE
 /**
  * Main layout component with navigation drawer and app bar
+ * Includes accessibility features: skip-to-content link, landmark roles, focus management
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Child components to render
  */
@@ -63,6 +64,16 @@ const Layout = ({ children }) => {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
+  
+  // Ref for main content to enable skip-to-content functionality
+  const mainContentRef = useRef(null);
+
+  // Focus management: move focus to main content on route change
+  useEffect(() => {
+    if (mainContentRef.current) {
+      mainContentRef.current.focus();
+    }
+  }, [location.pathname]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -86,6 +97,15 @@ const Layout = ({ children }) => {
     navigate('/login');
   };
 
+  // Skip to content handler
+  const handleSkipToContent = (e) => {
+    e.preventDefault();
+    if (mainContentRef.current) {
+      mainContentRef.current.focus();
+      mainContentRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const drawer = (
     <div>
       <Toolbar>
@@ -100,8 +120,9 @@ const Layout = ({ children }) => {
             <ListItemButton
               selected={location.pathname === item.path}
               onClick={() => handleMenuClick(item.path)}
+              aria-current={location.pathname === item.path ? 'page' : undefined}
             >
-              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemIcon aria-hidden="true">{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
           </ListItem>
@@ -112,8 +133,33 @@ const Layout = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex' }}>
+      {/* Skip to content link for keyboard users */}
+      <Box
+        component="a"
+        href="#main-content"
+        onClick={handleSkipToContent}
+        sx={{
+          position: 'absolute',
+          left: '-9999px',
+          zIndex: 999999,
+          padding: '1rem',
+          backgroundColor: 'primary.main',
+          color: 'primary.contrastText',
+          textDecoration: 'none',
+          '&:focus': {
+            left: '0',
+            top: '0',
+          },
+        }}
+      >
+        Skip to main content
+      </Box>
+
+      {/* Header with AppBar - semantic header role */}
       <AppBar
         position="fixed"
+        component="header"
+        role="banner"
         sx={{
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           ml: { sm: `${drawerWidth}px` },
@@ -122,7 +168,7 @@ const Layout = ({ children }) => {
         <Toolbar>
           <IconButton
             color="inherit"
-            aria-label="open drawer"
+            aria-label="open navigation menu"
             edge="start"
             onClick={handleDrawerToggle}
             sx={{ mr: 2, display: { sm: 'none' } }}
@@ -141,6 +187,7 @@ const Layout = ({ children }) => {
             <Chip
               label={`Tenant: ${currentTenant}`}
               size="small"
+              aria-label={`Current tenant: ${currentTenant}`}
               sx={{
                 mx: 1,
                 display: { xs: 'none', md: 'flex' },
@@ -152,13 +199,13 @@ const Layout = ({ children }) => {
           
           <IconButton
             size="large"
-            aria-label="account of current user"
+            aria-label="account menu for current user"
             aria-controls="menu-appbar"
             aria-haspopup="true"
             onClick={handleProfileMenuOpen}
             color="inherit"
           >
-            <Avatar sx={{ width: 32, height: 32 }}>
+            <Avatar sx={{ width: 32, height: 32 }} aria-hidden="true">
               {user?.name?.charAt(0).toUpperCase() || <AccountCircle />}
             </Avatar>
           </IconButton>
@@ -190,10 +237,13 @@ const Layout = ({ children }) => {
           </Menu>
         </Toolbar>
       </AppBar>
+
+      {/* Navigation drawer - semantic nav role */}
       <Box
         component="nav"
+        role="navigation"
+        aria-label="Main navigation"
         sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="navigation menu"
       >
         <Drawer
           variant="temporary"
@@ -220,13 +270,22 @@ const Layout = ({ children }) => {
           {drawer}
         </Drawer>
       </Box>
+
+      {/* Main content area - semantic main role */}
       <Box
         component="main"
+        id="main-content"
+        role="main"
+        ref={mainContentRef}
+        tabIndex={-1}
         sx={{
           flexGrow: 1,
           p: 3,
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           mt: 8,
+          '&:focus': {
+            outline: 'none',
+          },
         }}
       >
         {children}
