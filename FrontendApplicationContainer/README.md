@@ -1,82 +1,297 @@
-# Lightweight React Template for KAVIA
+# Device Remote Management Platform - Frontend
 
-This project provides a minimal React template with a clean, modern UI and minimal dependencies.
+A modern React-based single-page application (SPA) for managing network devices across multiple protocols including SNMP, WebPA, TR-69/ACS, and TR-369/USP.
 
 ## Features
 
-- **Lightweight**: No heavy UI frameworks - uses only vanilla CSS and React
-- **Modern UI**: Clean, responsive design with KAVIA brand styling
-- **Fast**: Minimal dependencies for quick loading times
-- **Simple**: Easy to understand and modify
+- **Multi-Protocol Support**: Unified interface for SNMP (v2/v3), WebPA, TR-69, and TR-369 protocols
+- **User Authentication**: JWT-based authentication with login and registration
+- **Device Management**: Full CRUD operations for network devices
+- **Protocol Operations**: Execute protocol-specific queries and commands
+- **Query History**: Track and review historical queries with export functionality
+- **MIB Management**: Upload and manage SNMP MIB files
+- **Real-time Updates**: Asynchronous query execution with status monitoring
+- **Export Capabilities**: Export query results in CSV and JSON formats
+- **Responsive Design**: Mobile-friendly interface using Material-UI
+- **State Management**: Redux Toolkit for global state management
+- **Data Fetching**: React Query for efficient API calls and caching
+
+## Tech Stack
+
+- **React 18.2** - UI framework
+- **React Router 6** - Client-side routing
+- **Redux Toolkit** - State management
+- **React Query (TanStack Query)** - Server state management
+- **Material-UI (MUI)** - Component library
+- **Axios** - HTTP client with interceptors
+- **React Hook Form** - Form handling
+- **Recharts** - Data visualization
+- **date-fns** - Date formatting
+- **file-saver** - File export functionality
+
+## Project Structure
+
+```
+src/
+├── api/                    # API service layer
+│   ├── axios.js           # Configured axios instance with JWT interceptors
+│   ├── auth.js            # Authentication API calls
+│   ├── devices.js         # Device management API calls
+│   ├── protocols.js       # Protocol operations API calls
+│   ├── config.js          # Configuration management (MIB uploads)
+│   └── export.js          # Export functionality API calls
+├── components/            # Reusable components
+│   ├── Layout.js          # Main layout with navigation
+│   └── ProtectedRoute.js  # Route guard for authentication
+├── pages/                 # Page components
+│   ├── Login.js           # Login page
+│   ├── Register.js        # Registration page
+│   ├── Dashboard.js       # Dashboard with statistics
+│   ├── Devices.js         # Device management page
+│   ├── QueryHistory.js    # Query history and results
+│   ├── MIBUpload.js       # MIB file management
+│   └── protocols/         # Protocol-specific pages
+│       ├── SNMPPage.js    # SNMP operations
+│       ├── WebPAPage.js   # WebPA operations
+│       ├── TR69Page.js    # TR-69 operations
+│       └── TR369Page.js   # TR-369/USP operations
+├── store/                 # Redux store configuration
+│   ├── index.js           # Store configuration
+│   └── slices/            # Redux slices
+│       ├── authSlice.js   # Authentication state
+│       ├── devicesSlice.js # Device state
+│       └── queriesSlice.js # Query state
+├── theme/                 # Material-UI theme
+│   └── index.js           # Theme configuration
+├── App.js                 # Main app component with routing
+├── index.js               # Application entry point
+├── App.css                # Global styles
+└── index.css              # Base styles
+```
 
 ## Getting Started
 
-In the project directory, you can run:
+### Prerequisites
 
-### `npm start`
+- Node.js 14+ and npm
+- Backend API server running (default: http://localhost:8080)
 
-Runs the app in development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Installation
 
-### `npm test`
+1. Install dependencies:
+```bash
+npm install
+```
 
-Launches the test runner in interactive watch mode.
+2. Configure environment variables:
+```bash
+cp .env.example .env
+```
 
-### `npm run build`
+Edit `.env` to set your backend API URL:
+```
+REACT_APP_API_URL=http://localhost:8080/api/v1
+REACT_APP_SITE_URL=http://localhost:3000
+REACT_APP_API_TIMEOUT=30000
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Development
 
-## Customization
+Run the development server:
+```bash
+npm start
+```
 
-### Colors
+The application will open at [http://localhost:3000](http://localhost:3000)
 
-The main brand colors are defined as CSS variables in `src/App.css`:
+### Building for Production
 
-```css
-:root {
-  --kavia-orange: #E87A41;
-  --kavia-dark: #1A1A1A;
-  --text-color: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --border-color: rgba(255, 255, 255, 0.1);
+Create an optimized production build:
+```bash
+npm run build
+```
+
+The build files will be in the `build/` directory.
+
+### Testing
+
+Run the test suite:
+```bash
+npm test
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REACT_APP_API_URL` | Backend API base URL | `http://localhost:8080/api/v1` |
+| `REACT_APP_SITE_URL` | Frontend site URL | `http://localhost:3000` |
+| `REACT_APP_API_TIMEOUT` | API request timeout (ms) | `30000` |
+| `REACT_APP_DEBUG` | Enable debug mode | `false` |
+
+**Note**: Environment variables must be requested from the user. The `.env` file should not be committed to version control. Use `.env.example` as a template.
+
+## Authentication
+
+The application uses JWT-based authentication:
+
+1. **Login**: POST to `/auth/login` with email and password
+2. **Token Storage**: JWT token stored in localStorage
+3. **Automatic Injection**: Axios interceptor adds token to all requests
+4. **Token Expiration**: 401 responses trigger automatic logout and redirect
+
+### Protected Routes
+
+All routes except `/login` and `/register` are protected and require authentication.
+
+## API Integration
+
+The frontend communicates with the backend via REST API. The base URL is configured via `REACT_APP_API_URL`.
+
+### API Structure
+
+- **Authentication**: `/auth/*`
+- **Devices**: `/devices/*`
+- **SNMP Protocol**: `/protocols/snmp/*`
+- **WebPA Protocol**: `/protocols/webpa/*`
+- **TR-69 Protocol**: `/protocols/tr69/*`
+- **TR-369 Protocol**: `/protocols/tr369/*`
+- **Query Management**: `/queries/*`
+- **Configuration**: `/config/*`
+- **Export**: `/export/*`
+
+## Features Guide
+
+### Device Management
+
+- **Add Device**: Click "Add Device" button on Devices page
+- **Edit Device**: Click edit icon next to any device
+- **Delete Device**: Click delete icon (with confirmation)
+- **View Devices**: Table view with pagination and sorting
+
+### Protocol Operations
+
+Each protocol page provides:
+- Operation selection (GET, SET, WALK, etc.)
+- Device selection dropdown
+- Parameter/OID input fields
+- Real-time result display
+- Job tracking with Job ID
+
+### Query History
+
+- View all historical queries
+- Filter and sort capabilities
+- Export results in CSV or JSON format
+- View detailed query results
+
+### MIB Management
+
+- Upload SNMP MIB files (.mib, .txt)
+- View list of uploaded MIBs
+- Delete MIBs when no longer needed
+
+## State Management
+
+### Redux Store Structure
+
+```javascript
+{
+  auth: {
+    user: {...},
+    token: "...",
+    isAuthenticated: true/false,
+    loading: false,
+    error: null
+  },
+  devices: {
+    devices: [...],
+    stats: {...},
+    pagination: {...},
+    loading: false,
+    error: null
+  },
+  queries: {
+    history: [...],
+    activeQueries: {...},
+    results: {...},
+    pagination: {...},
+    loading: false,
+    error: null
+  }
 }
 ```
 
-### Components
+## Responsive Design
 
-This template uses pure HTML/CSS components instead of a UI framework. You can find component styles in `src/App.css`. 
+The application is fully responsive and works on:
+- Desktop (1920px and above)
+- Laptop (1024px - 1919px)
+- Tablet (768px - 1023px)
+- Mobile (320px - 767px)
 
-Common components include:
-- Buttons (`.btn`, `.btn-large`)
-- Container (`.container`)
-- Navigation (`.navbar`)
-- Typography (`.title`, `.subtitle`, `.description`)
+Navigation automatically switches to drawer mode on mobile devices.
 
-## Learn More
+## Browser Support
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- Chrome (latest)
+- Firefox (latest)
+- Safari (latest)
+- Edge (latest)
 
-### Code Splitting
+## Performance Optimization
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+- Code splitting with React.lazy() (future enhancement)
+- React Query caching (5 minutes default)
+- Pagination for large datasets
+- Debounced search inputs
+- Memoized expensive computations
 
-### Analyzing the Bundle Size
+## Security Features
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+- JWT token authentication
+- Automatic token refresh handling
+- XSS protection via React's built-in escaping
+- CSRF protection via token-based auth
+- Secure HTTP-only cookie support (backend)
 
-### Making a Progressive Web App
+## Troubleshooting
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### Common Issues
 
-### Advanced Configuration
+1. **Cannot connect to backend**
+   - Check `REACT_APP_API_URL` in `.env`
+   - Ensure backend server is running
+   - Check CORS configuration on backend
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+2. **Authentication fails**
+   - Clear localStorage: `localStorage.clear()`
+   - Check token expiration
+   - Verify backend authentication endpoint
 
-### Deployment
+3. **Build fails**
+   - Delete `node_modules` and `package-lock.json`
+   - Run `npm install` again
+   - Check Node.js version (14+)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+4. **Queries not executing**
+   - Check device configuration
+   - Verify protocol support on device
+   - Check network connectivity to device
 
-### `npm run build` fails to minify
+## Contributing
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+1. Follow the existing code structure
+2. Use functional components with hooks
+3. Add JSDoc comments for public functions
+4. Include error handling in all async operations
+5. Test on multiple screen sizes
+6. Update this README for new features
+
+## License
+
+Proprietary - All rights reserved
+
+## Support
+
+For issues and questions, contact the development team or open an issue in the project repository.
