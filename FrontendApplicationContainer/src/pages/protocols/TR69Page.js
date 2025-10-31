@@ -19,16 +19,38 @@ import {
   TableHead,
   TableRow,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
-import { Add as AddIcon, Send as SendIcon, Cancel as CancelIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Send as SendIcon,
+  Cancel as CancelIcon,
+  Save as SaveIcon,
+  FolderOpen as LoadIcon,
+  Delete as DeleteIcon,
+} from '@mui/icons-material';
 import { fetchDevices } from '../../store/slices/devicesSlice';
-import { 
-  addActiveQuery, 
-  cancelQuery, 
+import {
+  addActiveQuery,
+  cancelQuery,
   selectActiveQueryById,
   selectIsQueryCancelling,
   selectCanCancelQuery,
+  fetchFavorites,
+  createFavorite,
+  deleteFavorite,
+  selectFavorites,
 } from '../../store/slices/queriesSlice';
+import { hasPermission } from '../../utils/permissions';
 import * as protocolsApi from '../../api/protocols';
 import useToast from '../../hooks/useToast';
 
@@ -37,12 +59,18 @@ const operations = ['GetParameterValues', 'SetParameterValues'];
 // PUBLIC_INTERFACE
 /**
  * TR69 protocol page component
- * Provides interface for TR69/ACS operations
+ * Provides interface for TR69/ACS operations with favorites support
  */
 const TR69Page = () => {
   const dispatch = useDispatch();
   const { devices } = useSelector((state) => state.devices);
+  const favorites = useSelector(selectFavorites);
+  const { user } = useSelector((state) => state.auth);
   const { showToast } = useToast();
+
+  const userPermissions = user?.permissions || [];
+  const canReadFavorites = hasPermission(userPermissions, 'queries:favorites:read');
+  const canWriteFavorites = hasPermission(userPermissions, 'queries:favorites:write');
 
   const [operation, setOperation] = useState('GetParameterValues');
   const [selectedDevice, setSelectedDevice] = useState('');
@@ -52,37 +80,48 @@ const TR69Page = () => {
   const [error, setError] = useState('');
   const [currentJobId, setCurrentJobId] = useState(null);
 
+  // Favorites dialogs
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [favoriteName, setFavoriteName] = useState('');
+  const [favoriteDescription, setFavoriteDescription] = useState('');
+  const [savingFavorite, setSavingFavorite] = useState(false);
+
   // Realtime query status from Redux store
-  const activeQuery = useSelector((state) => 
+  const activeQuery = useSelector((state) =>
     currentJobId ? selectActiveQueryById(currentJobId)(state) : null
   );
-  const isQueryCancelling = useSelector((state) => 
+  const isQueryCancelling = useSelector((state) =>
     currentJobId ? selectIsQueryCancelling(currentJobId)(state) : false
   );
-  const canCancelQuery = useSelector((state) => 
+  const canCancelQuery = useSelector((state) =>
     currentJobId ? selectCanCancelQuery(currentJobId)(state) : false
   );
 
   useEffect(() => {
     dispatch(fetchDevices({ pageSize: 100 }));
-  }, [dispatch]);
+    if (canReadFavorites) {
+      dispatch(fetchFavorites());
+    }
+  }, [dispatch, canReadFavorites]);
 
-  const tr69Devices = devices.filter(d => d.protocol === 'TR69');
+  const tr69Devices = devices.filter((d) => d.protocol === 'TR69');
+  const tr69Favorites = favorites.filter((f) => f.protocol === 'TR69');
 
   const handleAddParameter = () => {
     setParameters([...parameters, '']);
   };
 
   const handleParameterChange = (index, value) => {
-    const newParams = [...parameters];
-    newParams[index] = value;
-    setParameters(newParams);
+    const newParameters = [...parameters];
+    newParameters[index] = value;
+    setParameters(newParameters);
   };
 
   const handleRemoveParameter = (index) => {
     if (parameters.length > 1) {
-      const newParams = parameters.filter((_, i) => i !== index);
-      setParameters(newParams);
+      const newParameters = parameters.filter((_, i) => i !== index);
+      setParameters(newParameters);
     }
   };
 
@@ -108,8 +147,8 @@ const TR69Page = () => {
       return;
     }
 
-    const validParams = parameters.filter(param => param.trim() !== '');
-    if (validParams.length === 0) {
+    const validParameters = parameters.filter((param) => param.trim() !== '');
+    if (validParameters.length === 0) {
       setError('Please enter at least one parameter');
       return;
     }
@@ -120,7 +159,7 @@ const TR69Page = () => {
       let response;
       const requestData = {
         deviceId: selectedDevice,
-        parameters: validParams,
+        parameters: validParameters,
       };
 
       if (operation === 'GetParameterValues') {
@@ -131,17 +170,20 @@ const TR69Page = () => {
 
       setResult(response);
 
+      // Add to active queries
       if (response.jobId) {
         setCurrentJobId(response.jobId);
-        dispatch(addActiveQuery({
-          jobId: response.jobId,
-          queryData: {
-            protocol: 'TR69',
-            operation,
-            deviceId: selectedDevice,
-            parameters: validParams,
-          },
-        }));
+        dispatch(
+          addActiveQuery({
+            jobId: response.jobId,
+            queryData: {
+              protocol: 'TR69',
+              operation,
+              deviceId: selectedDevice,
+              parameters: validParameters,
+            },
+          })
+        );
         showToast('Query submitted successfully', { type: 'success' });
       }
     } catch (err) {
@@ -153,14 +195,114 @@ const TR69Page = () => {
     }
   };
 
+  const handleOpenSaveDialog = () => {
+    if (!canWriteFavorites) {
+      showToast('You do not have permission to save favorites', { type: 'error' });
+      return;
+    }
+
+    const validParameters = parameters.filter((param) => param.trim() !== '');
+    if (!selectedDevice || validParameters.length === 0) {
+      showToast('Please configure the query before saving', { type: 'warning' });
+      return;
+    }
+
+    const deviceName = tr69Devices.find((d) => d.id === selectedDevice)?.name || selectedDevice;
+    setFavoriteName(`TR69 ${operation} - ${deviceName}`);
+    setFavoriteDescription('');
+    setSaveDialogOpen(true);
+  };
+
+  const handleSaveFavorite = async () => {
+    if (!favoriteName.trim()) {
+      showToast('Please enter a name for the favorite', { type: 'warning' });
+      return;
+    }
+
+    setSavingFavorite(true);
+    try {
+      const validParameters = parameters.filter((param) => param.trim() !== '');
+      await dispatch(
+        createFavorite({
+          name: favoriteName,
+          description: favoriteDescription,
+          protocol: 'TR69',
+          operation,
+          deviceId: selectedDevice,
+          parameters: {
+            parameters: validParameters,
+          },
+        })
+      ).unwrap();
+
+      showToast('Favorite saved successfully', { type: 'success' });
+      setSaveDialogOpen(false);
+      setFavoriteName('');
+      setFavoriteDescription('');
+    } catch (err) {
+      showToast(err.message || 'Failed to save favorite', { type: 'error' });
+    } finally {
+      setSavingFavorite(false);
+    }
+  };
+
+  const handleLoadFavorite = (favorite) => {
+    setOperation(favorite.operation || 'GetParameterValues');
+    setSelectedDevice(favorite.deviceId || '');
+    setParameters(favorite.parameters?.parameters || ['']);
+    setLoadDialogOpen(false);
+    showToast(`Loaded favorite: ${favorite.name}`, { type: 'success' });
+  };
+
+  const handleDeleteFavorite = async (favoriteId, event) => {
+    event.stopPropagation();
+
+    if (!canWriteFavorites) {
+      showToast('You do not have permission to delete favorites', { type: 'error' });
+      return;
+    }
+
+    try {
+      await dispatch(deleteFavorite(favoriteId)).unwrap();
+      showToast('Favorite deleted successfully', { type: 'success' });
+    } catch (err) {
+      showToast(err.message || 'Failed to delete favorite', { type: 'error' });
+    }
+  };
+
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        TR-69 Protocol
-      </Typography>
-      <Typography variant="body2" color="textSecondary" paragraph>
-        Execute TR-69/ACS operations using ECO ACS REST API
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Box>
+          <Typography variant="h4">TR69/ACS Protocol</Typography>
+          <Typography variant="body2" color="textSecondary">
+            Execute TR69 operations: GetParameterValues and SetParameterValues
+          </Typography>
+        </Box>
+        {canReadFavorites && (
+          <Box>
+            <Tooltip title="Save current query as favorite">
+              <Button
+                variant="outlined"
+                startIcon={<SaveIcon />}
+                onClick={handleOpenSaveDialog}
+                sx={{ mr: 1 }}
+              >
+                Save as Favorite
+              </Button>
+            </Tooltip>
+            <Tooltip title="Load a saved favorite query">
+              <Button
+                variant="outlined"
+                startIcon={<LoadIcon />}
+                onClick={() => setLoadDialogOpen(true)}
+              >
+                Load Favorite
+              </Button>
+            </Tooltip>
+          </Box>
+        )}
+      </Box>
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
@@ -208,7 +350,7 @@ const TR69Page = () => {
                   <TextField
                     fullWidth
                     size="small"
-                    placeholder="e.g., InternetGatewayDevice.DeviceInfo.ModelName"
+                    placeholder="e.g., Device.DeviceInfo.SoftwareVersion"
                     value={param}
                     onChange={(e) => handleParameterChange(index, e.target.value)}
                   />
@@ -224,12 +366,7 @@ const TR69Page = () => {
                   )}
                 </Box>
               ))}
-              <Button
-                startIcon={<AddIcon />}
-                onClick={handleAddParameter}
-                size="small"
-                sx={{ mt: 1 }}
-              >
+              <Button startIcon={<AddIcon />} onClick={handleAddParameter} size="small" sx={{ mt: 1 }}>
                 Add Parameter
               </Button>
             </Box>
@@ -284,10 +421,13 @@ const TR69Page = () => {
                   <Chip
                     label={activeQuery?.status || result?.status || 'Pending'}
                     color={
-                      activeQuery?.status === 'completed' ? 'success' :
-                      activeQuery?.status === 'error' ? 'error' :
-                      activeQuery?.status === 'cancelled' ? 'warning' :
-                      'info'
+                      activeQuery?.status === 'completed'
+                        ? 'success'
+                        : activeQuery?.status === 'error'
+                        ? 'error'
+                        : activeQuery?.status === 'cancelled'
+                        ? 'warning'
+                        : 'info'
                     }
                     size="small"
                     sx={{ ml: 1 }}
@@ -353,6 +493,92 @@ const TR69Page = () => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Save Favorite Dialog */}
+      <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Save as Favorite</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Name"
+            value={favoriteName}
+            onChange={(e) => setFavoriteName(e.target.value)}
+            margin="normal"
+            required
+          />
+          <TextField
+            fullWidth
+            label="Description (optional)"
+            value={favoriteDescription}
+            onChange={(e) => setFavoriteDescription(e.target.value)}
+            margin="normal"
+            multiline
+            rows={2}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleSaveFavorite}
+            variant="contained"
+            disabled={savingFavorite}
+            startIcon={savingFavorite ? <CircularProgress size={16} /> : <SaveIcon />}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Load Favorite Dialog */}
+      <Dialog open={loadDialogOpen} onClose={() => setLoadDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Load Favorite Query</DialogTitle>
+        <DialogContent>
+          {tr69Favorites.length === 0 ? (
+            <Typography variant="body2" color="textSecondary" sx={{ p: 2, textAlign: 'center' }}>
+              No saved favorites for TR69 protocol
+            </Typography>
+          ) : (
+            <List>
+              {tr69Favorites.map((favorite) => (
+                <ListItem
+                  key={favorite.id}
+                  disablePadding
+                  secondaryAction={
+                    canWriteFavorites && (
+                      <IconButton
+                        edge="end"
+                        aria-label="delete"
+                        onClick={(e) => handleDeleteFavorite(favorite.id, e)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    )
+                  }
+                >
+                  <ListItemButton onClick={() => handleLoadFavorite(favorite)}>
+                    <ListItemText
+                      primary={favorite.name}
+                      secondary={
+                        <>
+                          {favorite.description && <div>{favorite.description}</div>}
+                          <div>
+                            {favorite.operation} • {favorite.parameters?.parameters?.length || 0}{' '}
+                            Parameters
+                          </div>
+                        </>
+                      }
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLoadDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -15,30 +15,58 @@ import {
   CircularProgress,
   IconButton,
   Button,
+  ToggleButtonGroup,
+  ToggleButton,
+  Tooltip,
 } from '@mui/material';
-import { Visibility as ViewIcon, GetApp as DownloadIcon } from '@mui/icons-material';
+import {
+  Visibility as ViewIcon,
+  GetApp as DownloadIcon,
+  Star as StarIcon,
+  StarBorder as StarBorderIcon,
+} from '@mui/icons-material';
 import { format } from 'date-fns';
 import { saveAs } from 'file-saver';
-import { fetchQueryHistory, fetchQueryResults } from '../store/slices/queriesSlice';
+import {
+  fetchQueryHistory,
+  fetchQueryResults,
+  fetchFavorites,
+  starQuery,
+  unstarQuery,
+} from '../store/slices/queriesSlice';
+import { hasPermission } from '../utils/permissions';
 import * as exportApi from '../api/export';
 
 // PUBLIC_INTERFACE
 /**
  * Query History page component
- * Displays historical queries with view and export functionality
+ * Displays historical queries with view, export, and favorite functionality
  */
 const QueryHistory = () => {
   const dispatch = useDispatch();
-  const { history, pagination, loading } = useSelector((state) => state.queries);
+  const { history, pagination, loading, favoritesByJobId } = useSelector(
+    (state) => state.queries
+  );
+  const { user } = useSelector((state) => state.auth);
+  const userPermissions = user?.permissions || [];
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [selectedQuery, setSelectedQuery] = useState(null);
   const [exportLoading, setExportLoading] = useState(null);
+  const [filter, setFilter] = useState('all'); // 'all' or 'favorites'
+  const [starringQueries, setStarringQueries] = useState({});
+
+  // Check permissions
+  const canReadFavorites = hasPermission(userPermissions, 'queries:favorites:read');
+  const canWriteFavorites = hasPermission(userPermissions, 'queries:favorites:write');
 
   useEffect(() => {
     dispatch(fetchQueryHistory({ page: page + 1, pageSize: rowsPerPage }));
-  }, [dispatch, page, rowsPerPage]);
+    if (canReadFavorites) {
+      dispatch(fetchFavorites());
+    }
+  }, [dispatch, page, rowsPerPage, canReadFavorites]);
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -47,6 +75,13 @@ const QueryHistory = () => {
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+  };
+
+  const handleFilterChange = (event, newFilter) => {
+    if (newFilter !== null) {
+      setFilter(newFilter);
+      setPage(0);
+    }
   };
 
   const handleViewResults = async (jobId) => {
@@ -74,6 +109,38 @@ const QueryHistory = () => {
     }
   };
 
+  const handleStarToggle = async (query) => {
+    if (!canWriteFavorites) return;
+
+    const jobId = query.jobId;
+    const isStarred = query.isStarred || !!favoritesByJobId[jobId];
+
+    setStarringQueries((prev) => ({ ...prev, [jobId]: true }));
+
+    try {
+      if (isStarred) {
+        await dispatch(unstarQuery(jobId)).unwrap();
+      } else {
+        // Create a favorite from this query
+        await dispatch(
+          starQuery({
+            jobId,
+            data: {
+              name: `${query.protocol} ${query.operation} - ${
+                query.deviceName || query.deviceId
+              }`,
+              description: `Starred from history on ${format(new Date(), 'MMM dd, yyyy')}`,
+            },
+          })
+        ).unwrap();
+      }
+    } catch (error) {
+      console.error('Failed to toggle star:', error);
+    } finally {
+      setStarringQueries((prev) => ({ ...prev, [jobId]: false }));
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'completed':
@@ -82,11 +149,22 @@ const QueryHistory = () => {
       case 'running':
         return 'info';
       case 'failed':
+      case 'error':
         return 'error';
+      case 'cancelled':
+        return 'warning';
       default:
         return 'default';
     }
   };
+
+  // Filter history based on selected filter
+  const filteredHistory =
+    filter === 'favorites'
+      ? history.filter((query) => {
+          return query.isStarred || !!favoritesByJobId[query.jobId];
+        })
+      : history;
 
   if (loading && history.length === 0) {
     return (
@@ -98,14 +176,32 @@ const QueryHistory = () => {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Query History
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4">Query History</Typography>
+        {canReadFavorites && (
+          <ToggleButtonGroup
+            value={filter}
+            exclusive
+            onChange={handleFilterChange}
+            aria-label="query filter"
+            size="small"
+          >
+            <ToggleButton value="all" aria-label="all queries">
+              All
+            </ToggleButton>
+            <ToggleButton value="favorites" aria-label="favorite queries">
+              <StarIcon sx={{ mr: 0.5, fontSize: 18 }} />
+              Favorites
+            </ToggleButton>
+          </ToggleButtonGroup>
+        )}
+      </Box>
 
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
+              {canReadFavorites && <TableCell width={50}></TableCell>}
               <TableCell>Job ID</TableCell>
               <TableCell>Protocol</TableCell>
               <TableCell>Operation</TableCell>
@@ -116,60 +212,89 @@ const QueryHistory = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {history.map((query) => (
-              <TableRow key={query.id || query.jobId}>
-                <TableCell>{query.jobId}</TableCell>
-                <TableCell>
-                  <Chip label={query.protocol} size="small" color="primary" />
-                </TableCell>
-                <TableCell>{query.operation}</TableCell>
-                <TableCell>{query.deviceName || query.deviceId}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={query.status}
-                    size="small"
-                    color={getStatusColor(query.status)}
-                  />
-                </TableCell>
-                <TableCell>
-                  {query.timestamp
-                    ? format(new Date(query.timestamp), 'MMM dd, yyyy HH:mm:ss')
-                    : 'N/A'}
-                </TableCell>
-                <TableCell align="right">
-                  <IconButton
-                    size="small"
-                    color="primary"
-                    onClick={() => handleViewResults(query.jobId)}
-                    title="View Results"
-                  >
-                    <ViewIcon />
-                  </IconButton>
-                  <Button
-                    size="small"
-                    startIcon={exportLoading === query.jobId ? <CircularProgress size={16} /> : <DownloadIcon />}
-                    onClick={() => handleExport(query.jobId, 'csv')}
-                    disabled={exportLoading === query.jobId || query.status !== 'completed'}
-                    sx={{ ml: 1 }}
-                  >
-                    CSV
-                  </Button>
-                  <Button
-                    size="small"
-                    startIcon={exportLoading === query.jobId ? <CircularProgress size={16} /> : <DownloadIcon />}
-                    onClick={() => handleExport(query.jobId, 'json')}
-                    disabled={exportLoading === query.jobId || query.status !== 'completed'}
-                    sx={{ ml: 1 }}
-                  >
-                    JSON
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-            {history.length === 0 && (
+            {filteredHistory.map((query) => {
+              const isStarred = query.isStarred || !!favoritesByJobId[query.jobId];
+              const isStarring = starringQueries[query.jobId];
+
+              return (
+                <TableRow key={query.id || query.jobId}>
+                  {canReadFavorites && (
+                    <TableCell>
+                      <Tooltip title={isStarred ? 'Remove from favorites' : 'Add to favorites'}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleStarToggle(query)}
+                            disabled={!canWriteFavorites || isStarring}
+                            color={isStarred ? 'primary' : 'default'}
+                          >
+                            {isStarring ? (
+                              <CircularProgress size={20} />
+                            ) : isStarred ? (
+                              <StarIcon />
+                            ) : (
+                              <StarBorderIcon />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </TableCell>
+                  )}
+                  <TableCell>{query.jobId}</TableCell>
+                  <TableCell>
+                    <Chip label={query.protocol} size="small" color="primary" />
+                  </TableCell>
+                  <TableCell>{query.operation}</TableCell>
+                  <TableCell>{query.deviceName || query.deviceId}</TableCell>
+                  <TableCell>
+                    <Chip label={query.status} size="small" color={getStatusColor(query.status)} />
+                  </TableCell>
+                  <TableCell>
+                    {query.timestamp
+                      ? format(new Date(query.timestamp), 'MMM dd, yyyy HH:mm:ss')
+                      : 'N/A'}
+                  </TableCell>
+                  <TableCell align="right">
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => handleViewResults(query.jobId)}
+                      title="View Results"
+                    >
+                      <ViewIcon />
+                    </IconButton>
+                    <Button
+                      size="small"
+                      startIcon={
+                        exportLoading === query.jobId ? <CircularProgress size={16} /> : <DownloadIcon />
+                      }
+                      onClick={() => handleExport(query.jobId, 'csv')}
+                      disabled={exportLoading === query.jobId || query.status !== 'completed'}
+                      sx={{ ml: 1 }}
+                    >
+                      CSV
+                    </Button>
+                    <Button
+                      size="small"
+                      startIcon={
+                        exportLoading === query.jobId ? <CircularProgress size={16} /> : <DownloadIcon />
+                      }
+                      onClick={() => handleExport(query.jobId, 'json')}
+                      disabled={exportLoading === query.jobId || query.status !== 'completed'}
+                      sx={{ ml: 1 }}
+                    >
+                      JSON
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {filteredHistory.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} align="center">
-                  No query history found
+                <TableCell colSpan={canReadFavorites ? 8 : 7} align="center">
+                  {filter === 'favorites'
+                    ? 'No favorite queries found'
+                    : 'No query history found'}
                 </TableCell>
               </TableRow>
             )}

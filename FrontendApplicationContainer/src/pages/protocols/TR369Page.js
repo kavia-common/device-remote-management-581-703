@@ -19,16 +19,38 @@ import {
   TableHead,
   TableRow,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
-import { Add as AddIcon, Send as SendIcon, Cancel as CancelIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Send as SendIcon,
+  Cancel as CancelIcon,
+  Save as SaveIcon,
+  FolderOpen as LoadIcon,
+  Delete as DeleteIcon,
+} from '@mui/icons-material';
 import { fetchDevices } from '../../store/slices/devicesSlice';
-import { 
-  addActiveQuery, 
-  cancelQuery, 
+import {
+  addActiveQuery,
+  cancelQuery,
   selectActiveQueryById,
   selectIsQueryCancelling,
   selectCanCancelQuery,
+  fetchFavorites,
+  createFavorite,
+  deleteFavorite,
+  selectFavorites,
 } from '../../store/slices/queriesSlice';
+import { hasPermission } from '../../utils/permissions';
 import * as protocolsApi from '../../api/protocols';
 import useToast from '../../hooks/useToast';
 
@@ -36,13 +58,19 @@ const operations = ['GET', 'SET'];
 
 // PUBLIC_INTERFACE
 /**
- * TR369 protocol page component
- * Provides interface for TR369/USP operations
+ * TR369/USP protocol page component
+ * Provides interface for TR369/USP operations with favorites support
  */
 const TR369Page = () => {
   const dispatch = useDispatch();
   const { devices } = useSelector((state) => state.devices);
+  const favorites = useSelector(selectFavorites);
+  const { user } = useSelector((state) => state.auth);
   const { showToast } = useToast();
+
+  const userPermissions = user?.permissions || [];
+  const canReadFavorites = hasPermission(userPermissions, 'queries:favorites:read');
+  const canWriteFavorites = hasPermission(userPermissions, 'queries:favorites:write');
 
   const [operation, setOperation] = useState('GET');
   const [selectedDevice, setSelectedDevice] = useState('');
@@ -52,22 +80,33 @@ const TR369Page = () => {
   const [error, setError] = useState('');
   const [currentJobId, setCurrentJobId] = useState(null);
 
+  // Favorites dialogs
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [favoriteName, setFavoriteName] = useState('');
+  const [favoriteDescription, setFavoriteDescription] = useState('');
+  const [savingFavorite, setSavingFavorite] = useState(false);
+
   // Realtime query status from Redux store
-  const activeQuery = useSelector((state) => 
+  const activeQuery = useSelector((state) =>
     currentJobId ? selectActiveQueryById(currentJobId)(state) : null
   );
-  const isQueryCancelling = useSelector((state) => 
+  const isQueryCancelling = useSelector((state) =>
     currentJobId ? selectIsQueryCancelling(currentJobId)(state) : false
   );
-  const canCancelQuery = useSelector((state) => 
+  const canCancelQuery = useSelector((state) =>
     currentJobId ? selectCanCancelQuery(currentJobId)(state) : false
   );
 
   useEffect(() => {
     dispatch(fetchDevices({ pageSize: 100 }));
-  }, [dispatch]);
+    if (canReadFavorites) {
+      dispatch(fetchFavorites());
+    }
+  }, [dispatch, canReadFavorites]);
 
-  const tr369Devices = devices.filter(d => d.protocol === 'TR369');
+  const tr369Devices = devices.filter((d) => d.protocol === 'TR369' || d.protocol === 'USP');
+  const tr369Favorites = favorites.filter((f) => f.protocol === 'TR369');
 
   const handleAddPath = () => {
     setPaths([...paths, '']);
@@ -108,9 +147,9 @@ const TR369Page = () => {
       return;
     }
 
-    const validPaths = paths.filter(path => path.trim() !== '');
+    const validPaths = paths.filter((path) => path.trim() !== '');
     if (validPaths.length === 0) {
-      setError('Please enter at least one data model path');
+      setError('Please enter at least one path');
       return;
     }
 
@@ -123,30 +162,28 @@ const TR369Page = () => {
         paths: validPaths,
       };
 
-      switch (operation) {
-        case 'GET':
-          response = await protocolsApi.tr369Get(requestData);
-          break;
-        case 'SET':
-          response = await protocolsApi.tr369Set(requestData);
-          break;
-        default:
-          throw new Error('Invalid operation');
+      if (operation === 'GET') {
+        response = await protocolsApi.tr369Get(requestData);
+      } else {
+        response = await protocolsApi.tr369Set(requestData);
       }
 
       setResult(response);
 
+      // Add to active queries
       if (response.jobId) {
         setCurrentJobId(response.jobId);
-        dispatch(addActiveQuery({
-          jobId: response.jobId,
-          queryData: {
-            protocol: 'TR369',
-            operation,
-            deviceId: selectedDevice,
-            paths: validPaths,
-          },
-        }));
+        dispatch(
+          addActiveQuery({
+            jobId: response.jobId,
+            queryData: {
+              protocol: 'TR369',
+              operation,
+              deviceId: selectedDevice,
+              paths: validPaths,
+            },
+          })
+        );
         showToast('Query submitted successfully', { type: 'success' });
       }
     } catch (err) {
@@ -158,14 +195,114 @@ const TR369Page = () => {
     }
   };
 
+  const handleOpenSaveDialog = () => {
+    if (!canWriteFavorites) {
+      showToast('You do not have permission to save favorites', { type: 'error' });
+      return;
+    }
+
+    const validPaths = paths.filter((path) => path.trim() !== '');
+    if (!selectedDevice || validPaths.length === 0) {
+      showToast('Please configure the query before saving', { type: 'warning' });
+      return;
+    }
+
+    const deviceName = tr369Devices.find((d) => d.id === selectedDevice)?.name || selectedDevice;
+    setFavoriteName(`TR369 ${operation} - ${deviceName}`);
+    setFavoriteDescription('');
+    setSaveDialogOpen(true);
+  };
+
+  const handleSaveFavorite = async () => {
+    if (!favoriteName.trim()) {
+      showToast('Please enter a name for the favorite', { type: 'warning' });
+      return;
+    }
+
+    setSavingFavorite(true);
+    try {
+      const validPaths = paths.filter((path) => path.trim() !== '');
+      await dispatch(
+        createFavorite({
+          name: favoriteName,
+          description: favoriteDescription,
+          protocol: 'TR369',
+          operation,
+          deviceId: selectedDevice,
+          parameters: {
+            paths: validPaths,
+          },
+        })
+      ).unwrap();
+
+      showToast('Favorite saved successfully', { type: 'success' });
+      setSaveDialogOpen(false);
+      setFavoriteName('');
+      setFavoriteDescription('');
+    } catch (err) {
+      showToast(err.message || 'Failed to save favorite', { type: 'error' });
+    } finally {
+      setSavingFavorite(false);
+    }
+  };
+
+  const handleLoadFavorite = (favorite) => {
+    setOperation(favorite.operation || 'GET');
+    setSelectedDevice(favorite.deviceId || '');
+    setPaths(favorite.parameters?.paths || ['']);
+    setLoadDialogOpen(false);
+    showToast(`Loaded favorite: ${favorite.name}`, { type: 'success' });
+  };
+
+  const handleDeleteFavorite = async (favoriteId, event) => {
+    event.stopPropagation();
+
+    if (!canWriteFavorites) {
+      showToast('You do not have permission to delete favorites', { type: 'error' });
+      return;
+    }
+
+    try {
+      await dispatch(deleteFavorite(favoriteId)).unwrap();
+      showToast('Favorite deleted successfully', { type: 'success' });
+    } catch (err) {
+      showToast(err.message || 'Failed to delete favorite', { type: 'error' });
+    }
+  };
+
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        TR-369 (USP) Protocol
-      </Typography>
-      <Typography variant="body2" color="textSecondary" paragraph>
-        Execute TR-369/USP operations for device management
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Box>
+          <Typography variant="h4">TR369/USP Protocol</Typography>
+          <Typography variant="body2" color="textSecondary">
+            Execute TR369/USP operations: GET and SET
+          </Typography>
+        </Box>
+        {canReadFavorites && (
+          <Box>
+            <Tooltip title="Save current query as favorite">
+              <Button
+                variant="outlined"
+                startIcon={<SaveIcon />}
+                onClick={handleOpenSaveDialog}
+                sx={{ mr: 1 }}
+              >
+                Save as Favorite
+              </Button>
+            </Tooltip>
+            <Tooltip title="Load a saved favorite query">
+              <Button
+                variant="outlined"
+                startIcon={<LoadIcon />}
+                onClick={() => setLoadDialogOpen(true)}
+              >
+                Load Favorite
+              </Button>
+            </Tooltip>
+          </Box>
+        )}
+      </Box>
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
@@ -229,12 +366,7 @@ const TR369Page = () => {
                   )}
                 </Box>
               ))}
-              <Button
-                startIcon={<AddIcon />}
-                onClick={handleAddPath}
-                size="small"
-                sx={{ mt: 1 }}
-              >
+              <Button startIcon={<AddIcon />} onClick={handleAddPath} size="small" sx={{ mt: 1 }}>
                 Add Path
               </Button>
             </Box>
@@ -289,10 +421,13 @@ const TR369Page = () => {
                   <Chip
                     label={activeQuery?.status || result?.status || 'Pending'}
                     color={
-                      activeQuery?.status === 'completed' ? 'success' :
-                      activeQuery?.status === 'error' ? 'error' :
-                      activeQuery?.status === 'cancelled' ? 'warning' :
-                      'info'
+                      activeQuery?.status === 'completed'
+                        ? 'success'
+                        : activeQuery?.status === 'error'
+                        ? 'error'
+                        : activeQuery?.status === 'cancelled'
+                        ? 'warning'
+                        : 'info'
                     }
                     size="small"
                     sx={{ ml: 1 }}
@@ -358,6 +493,91 @@ const TR369Page = () => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Save Favorite Dialog */}
+      <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Save as Favorite</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Name"
+            value={favoriteName}
+            onChange={(e) => setFavoriteName(e.target.value)}
+            margin="normal"
+            required
+          />
+          <TextField
+            fullWidth
+            label="Description (optional)"
+            value={favoriteDescription}
+            onChange={(e) => setFavoriteDescription(e.target.value)}
+            margin="normal"
+            multiline
+            rows={2}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleSaveFavorite}
+            variant="contained"
+            disabled={savingFavorite}
+            startIcon={savingFavorite ? <CircularProgress size={16} /> : <SaveIcon />}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Load Favorite Dialog */}
+      <Dialog open={loadDialogOpen} onClose={() => setLoadDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Load Favorite Query</DialogTitle>
+        <DialogContent>
+          {tr369Favorites.length === 0 ? (
+            <Typography variant="body2" color="textSecondary" sx={{ p: 2, textAlign: 'center' }}>
+              No saved favorites for TR369 protocol
+            </Typography>
+          ) : (
+            <List>
+              {tr369Favorites.map((favorite) => (
+                <ListItem
+                  key={favorite.id}
+                  disablePadding
+                  secondaryAction={
+                    canWriteFavorites && (
+                      <IconButton
+                        edge="end"
+                        aria-label="delete"
+                        onClick={(e) => handleDeleteFavorite(favorite.id, e)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    )
+                  }
+                >
+                  <ListItemButton onClick={() => handleLoadFavorite(favorite)}>
+                    <ListItemText
+                      primary={favorite.name}
+                      secondary={
+                        <>
+                          {favorite.description && <div>{favorite.description}</div>}
+                          <div>
+                            {favorite.operation} • {favorite.parameters?.paths?.length || 0} Paths
+                          </div>
+                        </>
+                      }
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLoadDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

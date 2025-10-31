@@ -81,6 +81,10 @@ export const PERMISSIONS = {
   QUERY_WRITE: 'query:write',
   QUERY_DELETE: 'query:delete',
   
+  // Query favorites permissions
+  QUERY_FAVORITES_READ: 'queries:favorites:read',
+  QUERY_FAVORITES_WRITE: 'queries:favorites:write',
+  
   // MIB permissions
   MIB_UPLOAD: 'mib:upload',
   MIB_DELETE: 'mib:delete',

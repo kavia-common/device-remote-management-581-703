@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import * as protocolsApi from '../../api/protocols';
+import * as queriesApi from '../../api/queries';
 
 // Async thunks
 
@@ -68,13 +69,127 @@ export const cancelQuery = createAsyncThunk(
   }
 );
 
+// Favorites thunks
+
+// PUBLIC_INTERFACE
+/**
+ * Fetch list of favorite queries
+ * Requires 'queries:favorites:read' permission
+ */
+export const fetchFavorites = createAsyncThunk(
+  'queries/fetchFavorites',
+  async (params, { rejectWithValue }) => {
+    try {
+      const response = await queriesApi.listFavorites(params);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: 'Failed to fetch favorites' });
+    }
+  }
+);
+
+// PUBLIC_INTERFACE
+/**
+ * Create a new favorite query
+ * Requires 'queries:favorites:write' permission
+ */
+export const createFavorite = createAsyncThunk(
+  'queries/createFavorite',
+  async (data, { rejectWithValue }) => {
+    try {
+      const response = await queriesApi.createFavorite(data);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: 'Failed to create favorite' });
+    }
+  }
+);
+
+// PUBLIC_INTERFACE
+/**
+ * Get a specific favorite query
+ * Requires 'queries:favorites:read' permission
+ */
+export const getFavorite = createAsyncThunk(
+  'queries/getFavorite',
+  async (favoriteId, { rejectWithValue }) => {
+    try {
+      const response = await queriesApi.getFavorite(favoriteId);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: 'Failed to get favorite' });
+    }
+  }
+);
+
+// PUBLIC_INTERFACE
+/**
+ * Delete a favorite query
+ * Requires 'queries:favorites:write' permission
+ */
+export const deleteFavorite = createAsyncThunk(
+  'queries/deleteFavorite',
+  async (favoriteId, { rejectWithValue }) => {
+    try {
+      await queriesApi.deleteFavorite(favoriteId);
+      return { favoriteId };
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: 'Failed to delete favorite' });
+    }
+  }
+);
+
+// PUBLIC_INTERFACE
+/**
+ * Star a query from history
+ * Requires 'queries:favorites:write' permission
+ */
+export const starQuery = createAsyncThunk(
+  'queries/starQuery',
+  async ({ jobId, data }, { rejectWithValue }) => {
+    try {
+      const response = await queriesApi.starQuery(jobId, data);
+      return { jobId, favorite: response };
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: 'Failed to star query' });
+    }
+  }
+);
+
+// PUBLIC_INTERFACE
+/**
+ * Unstar a query
+ * Requires 'queries:favorites:write' permission
+ */
+export const unstarQuery = createAsyncThunk(
+  'queries/unstarQuery',
+  async (jobId, { rejectWithValue }) => {
+    try {
+      await queriesApi.unstarQuery(jobId);
+      return { jobId };
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: 'Failed to unstar query' });
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   history: [],
   activeQueries: {},
-  cancellingQueries: {}, // Track queries being cancelled
+  cancellingQueries: {},
   results: {},
+  favorites: [],
+  favoritesByJobId: {}, // Map jobId to favoriteId for quick lookup
+  loadingFavorites: false,
+  favoritesError: null,
   pagination: {
+    page: 1,
+    pageSize: 50,
+    totalPages: 0,
+    totalItems: 0,
+  },
+  favoritesPagination: {
     page: 1,
     pageSize: 50,
     totalPages: 0,
@@ -92,6 +207,9 @@ const queriesSlice = createSlice({
   reducers: {
     clearError: (state) => {
       state.error = null;
+    },
+    clearFavoritesError: (state) => {
+      state.favoritesError = null;
     },
     addActiveQuery: (state, action) => {
       const { jobId, queryData } = action.payload;
@@ -301,6 +419,94 @@ const queriesSlice = createSlice({
         const jobId = action.meta.arg;
         delete state.cancellingQueries[jobId];
         state.error = action.payload?.message || 'Failed to cancel query';
+      })
+      // Fetch favorites
+      .addCase(fetchFavorites.pending, (state) => {
+        state.loadingFavorites = true;
+        state.favoritesError = null;
+      })
+      .addCase(fetchFavorites.fulfilled, (state, action) => {
+        state.loadingFavorites = false;
+        state.favorites = action.payload.data || action.payload.favorites || [];
+        state.favoritesPagination = action.payload.pagination || state.favoritesPagination;
+        
+        // Build favoritesByJobId map
+        state.favoritesByJobId = {};
+        state.favorites.forEach(fav => {
+          if (fav.jobId) {
+            state.favoritesByJobId[fav.jobId] = fav.id;
+          }
+        });
+      })
+      .addCase(fetchFavorites.rejected, (state, action) => {
+        state.loadingFavorites = false;
+        state.favoritesError = action.payload?.message || 'Failed to fetch favorites';
+      })
+      // Create favorite
+      .addCase(createFavorite.fulfilled, (state, action) => {
+        const favorite = action.payload.data || action.payload;
+        state.favorites.unshift(favorite);
+        if (favorite.jobId) {
+          state.favoritesByJobId[favorite.jobId] = favorite.id;
+        }
+      })
+      .addCase(createFavorite.rejected, (state, action) => {
+        state.favoritesError = action.payload?.message || 'Failed to create favorite';
+      })
+      // Delete favorite
+      .addCase(deleteFavorite.fulfilled, (state, action) => {
+        const { favoriteId } = action.payload;
+        const index = state.favorites.findIndex(f => f.id === favoriteId);
+        if (index >= 0) {
+          const favorite = state.favorites[index];
+          if (favorite.jobId) {
+            delete state.favoritesByJobId[favorite.jobId];
+          }
+          state.favorites.splice(index, 1);
+        }
+      })
+      .addCase(deleteFavorite.rejected, (state, action) => {
+        state.favoritesError = action.payload?.message || 'Failed to delete favorite';
+      })
+      // Star query
+      .addCase(starQuery.fulfilled, (state, action) => {
+        const { jobId, favorite } = action.payload;
+        const favoriteData = favorite.data || favorite;
+        state.favorites.unshift(favoriteData);
+        state.favoritesByJobId[jobId] = favoriteData.id;
+        
+        // Update history item to mark as starred
+        const historyIndex = state.history.findIndex(q => q.jobId === jobId);
+        if (historyIndex >= 0) {
+          state.history[historyIndex].isStarred = true;
+          state.history[historyIndex].favoriteId = favoriteData.id;
+        }
+      })
+      .addCase(starQuery.rejected, (state, action) => {
+        state.favoritesError = action.payload?.message || 'Failed to star query';
+      })
+      // Unstar query
+      .addCase(unstarQuery.fulfilled, (state, action) => {
+        const { jobId } = action.payload;
+        const favoriteId = state.favoritesByJobId[jobId];
+        
+        if (favoriteId) {
+          const index = state.favorites.findIndex(f => f.id === favoriteId);
+          if (index >= 0) {
+            state.favorites.splice(index, 1);
+          }
+          delete state.favoritesByJobId[jobId];
+        }
+        
+        // Update history item to unmark as starred
+        const historyIndex = state.history.findIndex(q => q.jobId === jobId);
+        if (historyIndex >= 0) {
+          state.history[historyIndex].isStarred = false;
+          delete state.history[historyIndex].favoriteId;
+        }
+      })
+      .addCase(unstarQuery.rejected, (state, action) => {
+        state.favoritesError = action.payload?.message || 'Failed to unstar query';
       });
   },
 });
@@ -351,8 +557,43 @@ export const selectCanCancelQuery = (jobId) => (state) => {
   return inFlightStatuses.includes(query.status);
 };
 
+// PUBLIC_INTERFACE
+/**
+ * Select all favorite queries
+ */
+export const selectFavorites = (state) => state.queries.favorites;
+
+// PUBLIC_INTERFACE
+/**
+ * Check if a query is starred (is a favorite)
+ */
+export const selectIsQueryStarred = (jobId) => (state) => {
+  return !!state.queries.favoritesByJobId[jobId];
+};
+
+// PUBLIC_INTERFACE
+/**
+ * Get favorite ID for a query
+ */
+export const selectFavoriteIdByJobId = (jobId) => (state) => {
+  return state.queries.favoritesByJobId[jobId];
+};
+
+// PUBLIC_INTERFACE
+/**
+ * Select favorites loading state
+ */
+export const selectLoadingFavorites = (state) => state.queries.loadingFavorites;
+
+// PUBLIC_INTERFACE
+/**
+ * Select favorites error
+ */
+export const selectFavoritesError = (state) => state.queries.favoritesError;
+
 export const { 
-  clearError, 
+  clearError,
+  clearFavoritesError,
   addActiveQuery, 
   updateQueryStatus, 
   removeActiveQuery,

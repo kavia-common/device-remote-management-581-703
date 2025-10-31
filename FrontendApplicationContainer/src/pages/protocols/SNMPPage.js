@@ -19,8 +19,25 @@ import {
   TableHead,
   TableRow,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
-import { Add as AddIcon, Send as SendIcon, Cancel as CancelIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Send as SendIcon,
+  Cancel as CancelIcon,
+  Save as SaveIcon,
+  FolderOpen as LoadIcon,
+  Delete as DeleteIcon,
+} from '@mui/icons-material';
 import { fetchDevices } from '../../store/slices/devicesSlice';
 import { 
   addActiveQuery, 
@@ -28,7 +45,12 @@ import {
   selectActiveQueryById,
   selectIsQueryCancelling,
   selectCanCancelQuery,
+  fetchFavorites,
+  createFavorite,
+  deleteFavorite,
+  selectFavorites,
 } from '../../store/slices/queriesSlice';
+import { hasPermission } from '../../utils/permissions';
 import * as protocolsApi from '../../api/protocols';
 import useToast from '../../hooks/useToast';
 
@@ -37,12 +59,18 @@ const operations = ['GET', 'SET', 'WALK'];
 // PUBLIC_INTERFACE
 /**
  * SNMP protocol page component
- * Provides interface for SNMP operations (GET, SET, WALK)
+ * Provides interface for SNMP operations (GET, SET, WALK) with favorites support
  */
 const SNMPPage = () => {
   const dispatch = useDispatch();
   const { devices } = useSelector((state) => state.devices);
+  const favorites = useSelector(selectFavorites);
+  const { user } = useSelector((state) => state.auth);
   const { showToast } = useToast();
+  
+  const userPermissions = user?.permissions || [];
+  const canReadFavorites = hasPermission(userPermissions, 'queries:favorites:read');
+  const canWriteFavorites = hasPermission(userPermissions, 'queries:favorites:write');
 
   const [operation, setOperation] = useState('GET');
   const [selectedDevice, setSelectedDevice] = useState('');
@@ -51,6 +79,13 @@ const SNMPPage = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [currentJobId, setCurrentJobId] = useState(null);
+  
+  // Favorites dialogs
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [favoriteName, setFavoriteName] = useState('');
+  const [favoriteDescription, setFavoriteDescription] = useState('');
+  const [savingFavorite, setSavingFavorite] = useState(false);
 
   // Realtime query status from Redux store
   const activeQuery = useSelector((state) => 
@@ -65,9 +100,13 @@ const SNMPPage = () => {
 
   useEffect(() => {
     dispatch(fetchDevices({ pageSize: 100 }));
-  }, [dispatch]);
+    if (canReadFavorites) {
+      dispatch(fetchFavorites());
+    }
+  }, [dispatch, canReadFavorites]);
 
   const snmpDevices = devices.filter(d => d.protocol === 'SNMP');
+  const snmpFavorites = favorites.filter(f => f.protocol === 'SNMP');
 
   const handleAddOid = () => {
     setOids([...oids, '']);
@@ -162,14 +201,115 @@ const SNMPPage = () => {
     }
   };
 
+  const handleOpenSaveDialog = () => {
+    if (!canWriteFavorites) {
+      showToast('You do not have permission to save favorites', { type: 'error' });
+      return;
+    }
+    
+    const validOids = oids.filter(oid => oid.trim() !== '');
+    if (!selectedDevice || validOids.length === 0) {
+      showToast('Please configure the query before saving', { type: 'warning' });
+      return;
+    }
+    
+    // Pre-fill with a default name
+    const deviceName = snmpDevices.find(d => d.id === selectedDevice)?.name || selectedDevice;
+    setFavoriteName(`SNMP ${operation} - ${deviceName}`);
+    setFavoriteDescription('');
+    setSaveDialogOpen(true);
+  };
+
+  const handleSaveFavorite = async () => {
+    if (!favoriteName.trim()) {
+      showToast('Please enter a name for the favorite', { type: 'warning' });
+      return;
+    }
+
+    setSavingFavorite(true);
+    try {
+      const validOids = oids.filter(oid => oid.trim() !== '');
+      await dispatch(
+        createFavorite({
+          name: favoriteName,
+          description: favoriteDescription,
+          protocol: 'SNMP',
+          operation,
+          deviceId: selectedDevice,
+          parameters: {
+            oids: validOids,
+          },
+        })
+      ).unwrap();
+      
+      showToast('Favorite saved successfully', { type: 'success' });
+      setSaveDialogOpen(false);
+      setFavoriteName('');
+      setFavoriteDescription('');
+    } catch (err) {
+      showToast(err.message || 'Failed to save favorite', { type: 'error' });
+    } finally {
+      setSavingFavorite(false);
+    }
+  };
+
+  const handleLoadFavorite = (favorite) => {
+    setOperation(favorite.operation || 'GET');
+    setSelectedDevice(favorite.deviceId || '');
+    setOids(favorite.parameters?.oids || ['']);
+    setLoadDialogOpen(false);
+    showToast(`Loaded favorite: ${favorite.name}`, { type: 'success' });
+  };
+
+  const handleDeleteFavorite = async (favoriteId, event) => {
+    event.stopPropagation();
+    
+    if (!canWriteFavorites) {
+      showToast('You do not have permission to delete favorites', { type: 'error' });
+      return;
+    }
+
+    try {
+      await dispatch(deleteFavorite(favoriteId)).unwrap();
+      showToast('Favorite deleted successfully', { type: 'success' });
+    } catch (err) {
+      showToast(err.message || 'Failed to delete favorite', { type: 'error' });
+    }
+  };
+
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        SNMP Protocol
-      </Typography>
-      <Typography variant="body2" color="textSecondary" paragraph>
-        Execute SNMP v2/v3 operations: GET, SET, and WALK
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Box>
+          <Typography variant="h4">SNMP Protocol</Typography>
+          <Typography variant="body2" color="textSecondary">
+            Execute SNMP v2/v3 operations: GET, SET, and WALK
+          </Typography>
+        </Box>
+        {canReadFavorites && (
+          <Box>
+            <Tooltip title="Save current query as favorite">
+              <Button
+                variant="outlined"
+                startIcon={<SaveIcon />}
+                onClick={handleOpenSaveDialog}
+                sx={{ mr: 1 }}
+              >
+                Save as Favorite
+              </Button>
+            </Tooltip>
+            <Tooltip title="Load a saved favorite query">
+              <Button
+                variant="outlined"
+                startIcon={<LoadIcon />}
+                onClick={() => setLoadDialogOpen(true)}
+              >
+                Load Favorite
+              </Button>
+            </Tooltip>
+          </Box>
+        )}
+      </Box>
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
@@ -362,6 +502,91 @@ const SNMPPage = () => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Save Favorite Dialog */}
+      <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Save as Favorite</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Name"
+            value={favoriteName}
+            onChange={(e) => setFavoriteName(e.target.value)}
+            margin="normal"
+            required
+          />
+          <TextField
+            fullWidth
+            label="Description (optional)"
+            value={favoriteDescription}
+            onChange={(e) => setFavoriteDescription(e.target.value)}
+            margin="normal"
+            multiline
+            rows={2}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleSaveFavorite}
+            variant="contained"
+            disabled={savingFavorite}
+            startIcon={savingFavorite ? <CircularProgress size={16} /> : <SaveIcon />}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Load Favorite Dialog */}
+      <Dialog open={loadDialogOpen} onClose={() => setLoadDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Load Favorite Query</DialogTitle>
+        <DialogContent>
+          {snmpFavorites.length === 0 ? (
+            <Typography variant="body2" color="textSecondary" sx={{ p: 2, textAlign: 'center' }}>
+              No saved favorites for SNMP protocol
+            </Typography>
+          ) : (
+            <List>
+              {snmpFavorites.map((favorite) => (
+                <ListItem
+                  key={favorite.id}
+                  disablePadding
+                  secondaryAction={
+                    canWriteFavorites && (
+                      <IconButton
+                        edge="end"
+                        aria-label="delete"
+                        onClick={(e) => handleDeleteFavorite(favorite.id, e)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    )
+                  }
+                >
+                  <ListItemButton onClick={() => handleLoadFavorite(favorite)}>
+                    <ListItemText
+                      primary={favorite.name}
+                      secondary={
+                        <>
+                          {favorite.description && <div>{favorite.description}</div>}
+                          <div>
+                            {favorite.operation} • {favorite.parameters?.oids?.length || 0} OIDs
+                          </div>
+                        </>
+                      }
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLoadDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
