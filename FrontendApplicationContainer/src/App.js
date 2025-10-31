@@ -18,6 +18,7 @@ import TR69Page from './pages/protocols/TR69Page';
 import TR369Page from './pages/protocols/TR369Page';
 import QueryHistory from './pages/QueryHistory';
 import MIBUpload from './pages/MIBUpload';
+import Unauthorized from './pages/Unauthorized';
 
 // App shell providers
 import AppErrorBoundary from './components/AppErrorBoundary';
@@ -68,6 +69,7 @@ function App() {
                         {/* Public routes */}
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
+                        <Route path="/unauthorized" element={<Unauthorized />} />
 
                         {/* Protected routes */}
                         <Route

@@ -21,6 +21,7 @@ import {
   DialogActions,
   TextField,
   MenuItem,
+  Tooltip,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -28,6 +29,9 @@ import {
   Add as AddIcon,
 } from '@mui/icons-material';
 import { fetchDevices, createDevice, updateDevice, deleteDevice } from '../store/slices/devicesSlice';
+import { selectHasPermission } from '../store/slices/authSlice';
+import { WithPermission } from '../components/withPermission';
+import { PERMISSIONS } from '../utils/permissions';
 
 const protocols = ['SNMP', 'WebPA', 'TR69', 'TR369'];
 
@@ -35,10 +39,15 @@ const protocols = ['SNMP', 'WebPA', 'TR69', 'TR369'];
 /**
  * Devices page component
  * Displays device list with CRUD operations
+ * Implements RBAC for device write and delete operations
  */
 const Devices = () => {
   const dispatch = useDispatch();
   const { devices, pagination, loading } = useSelector((state) => state.devices);
+  
+  // Check permissions for device operations
+  const canWriteDevice = useSelector(selectHasPermission(PERMISSIONS.DEVICE_WRITE));
+  const canDeleteDevice = useSelector(selectHasPermission(PERMISSIONS.DEVICE_DELETE));
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
@@ -126,13 +135,31 @@ const Devices = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">Devices</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
+        {/* Gate Add Device button behind device:write permission */}
+        <WithPermission
+          requiredPermissions={[PERMISSIONS.DEVICE_WRITE]}
+          fallback={
+            <Tooltip title="You don't have permission to add devices">
+              <span>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  disabled
+                >
+                  Add Device
+                </Button>
+              </span>
+            </Tooltip>
+          }
         >
-          Add Device
-        </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            Add Device
+          </Button>
+        </WithPermission>
       </Box>
 
       <TableContainer component={Paper}>
@@ -164,20 +191,49 @@ const Devices = () => {
                 </TableCell>
                 <TableCell>{device.description}</TableCell>
                 <TableCell align="right">
-                  <IconButton
-                    size="small"
-                    color="primary"
-                    onClick={() => handleOpenDialog(device)}
+                  {/* Gate Edit button behind device:write permission */}
+                  <WithPermission
+                    requiredPermissions={[PERMISSIONS.DEVICE_WRITE]}
+                    fallback={
+                      <Tooltip title="You don't have permission to edit devices">
+                        <span>
+                          <IconButton size="small" color="primary" disabled>
+                            <EditIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    }
                   >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => handleDelete(device.id)}
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => handleOpenDialog(device)}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                  </WithPermission>
+                  
+                  {/* Gate Delete button behind device:delete permission */}
+                  <WithPermission
+                    requiredPermissions={[PERMISSIONS.DEVICE_DELETE]}
+                    fallback={
+                      <Tooltip title="You don't have permission to delete devices">
+                        <span>
+                          <IconButton size="small" color="error" disabled>
+                            <DeleteIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    }
                   >
-                    <DeleteIcon />
-                  </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDelete(device.id)}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </WithPermission>
                 </TableCell>
               </TableRow>
             ))}
