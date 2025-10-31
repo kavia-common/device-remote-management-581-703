@@ -32,6 +32,7 @@ import { fetchDevices, createDevice, updateDevice, deleteDevice } from '../store
 import { selectHasPermission } from '../store/slices/authSlice';
 import { WithPermission } from '../components/withPermission';
 import { PERMISSIONS } from '../utils/permissions';
+import useToast from '../hooks/useToast';
 
 const protocols = ['SNMP', 'WebPA', 'TR69', 'TR369'];
 
@@ -44,6 +45,7 @@ const protocols = ['SNMP', 'WebPA', 'TR69', 'TR369'];
 const Devices = () => {
   const dispatch = useDispatch();
   const { devices, pagination, loading } = useSelector((state) => state.devices);
+  const { showToast } = useToast();
   
   // Check permissions for device operations
   const canWriteDevice = useSelector(selectHasPermission(PERMISSIONS.DEVICE_WRITE));
@@ -107,19 +109,30 @@ const Devices = () => {
   };
 
   const handleSubmit = async () => {
-    if (editingDevice) {
-      await dispatch(updateDevice({ deviceId: editingDevice.id, deviceData: formData }));
-    } else {
-      await dispatch(createDevice(formData));
+    try {
+      if (editingDevice) {
+        await dispatch(updateDevice({ deviceId: editingDevice.id, deviceData: formData })).unwrap();
+        showToast('Device updated successfully', { type: 'success' });
+      } else {
+        await dispatch(createDevice(formData)).unwrap();
+        showToast('Device created successfully', { type: 'success' });
+      }
+      handleCloseDialog();
+      dispatch(fetchDevices({ page: page + 1, pageSize: rowsPerPage }));
+    } catch (error) {
+      showToast(error.message || 'Operation failed', { type: 'error' });
     }
-    handleCloseDialog();
-    dispatch(fetchDevices({ page: page + 1, pageSize: rowsPerPage }));
   };
 
   const handleDelete = async (deviceId) => {
     if (window.confirm('Are you sure you want to delete this device?')) {
-      await dispatch(deleteDevice(deviceId));
-      dispatch(fetchDevices({ page: page + 1, pageSize: rowsPerPage }));
+      try {
+        await dispatch(deleteDevice(deviceId)).unwrap();
+        showToast('Device deleted successfully', { type: 'success' });
+        dispatch(fetchDevices({ page: page + 1, pageSize: rowsPerPage }));
+      } catch (error) {
+        showToast(error.message || 'Failed to delete device', { type: 'error' });
+      }
     }
   };
 

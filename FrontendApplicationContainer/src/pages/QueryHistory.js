@@ -36,11 +36,13 @@ import {
 } from '../store/slices/queriesSlice';
 import { hasPermission } from '../utils/permissions';
 import * as exportApi from '../api/export';
+import useToast from '../hooks/useToast';
 
 // PUBLIC_INTERFACE
 /**
  * Query History page component
  * Displays historical queries with view, export, and favorite functionality
+ * Uses toast notifications for success and error messages
  */
 const QueryHistory = () => {
   const dispatch = useDispatch();
@@ -49,6 +51,7 @@ const QueryHistory = () => {
   );
   const { user } = useSelector((state) => state.auth);
   const userPermissions = user?.permissions || [];
+  const { showToast } = useToast();
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
@@ -88,6 +91,9 @@ const QueryHistory = () => {
     const result = await dispatch(fetchQueryResults(jobId));
     if (fetchQueryResults.fulfilled.match(result)) {
       setSelectedQuery(result.payload);
+      showToast('Query results loaded', { type: 'success' });
+    } else {
+      showToast('Failed to load query results', { type: 'error' });
     }
   };
 
@@ -98,19 +104,24 @@ const QueryHistory = () => {
       if (format === 'csv') {
         blob = await exportApi.exportResultsAsCSV(jobId);
         saveAs(blob, `query-${jobId}.csv`);
+        showToast('Results exported as CSV', { type: 'success' });
       } else {
         blob = await exportApi.exportResultsAsJSON(jobId);
         saveAs(blob, `query-${jobId}.json`);
+        showToast('Results exported as JSON', { type: 'success' });
       }
     } catch (error) {
-      console.error('Export failed:', error);
+      showToast(error.response?.data?.message || 'Export failed', { type: 'error' });
     } finally {
       setExportLoading(null);
     }
   };
 
   const handleStarToggle = async (query) => {
-    if (!canWriteFavorites) return;
+    if (!canWriteFavorites) {
+      showToast('You do not have permission to manage favorites', { type: 'error' });
+      return;
+    }
 
     const jobId = query.jobId;
     const isStarred = query.isStarred || !!favoritesByJobId[jobId];
@@ -120,6 +131,7 @@ const QueryHistory = () => {
     try {
       if (isStarred) {
         await dispatch(unstarQuery(jobId)).unwrap();
+        showToast('Removed from favorites', { type: 'success' });
       } else {
         // Create a favorite from this query
         await dispatch(
@@ -133,9 +145,10 @@ const QueryHistory = () => {
             },
           })
         ).unwrap();
+        showToast('Added to favorites', { type: 'success' });
       }
     } catch (error) {
-      console.error('Failed to toggle star:', error);
+      showToast(error.message || 'Failed to toggle favorite', { type: 'error' });
     } finally {
       setStarringQueries((prev) => ({ ...prev, [jobId]: false }));
     }

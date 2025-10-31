@@ -9,24 +9,24 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
-  Alert,
   CircularProgress,
   Divider,
 } from '@mui/material';
 import { CloudUpload as UploadIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import * as configApi from '../api/config';
+import useToast from '../hooks/useToast';
 
 // PUBLIC_INTERFACE
 /**
  * MIB Upload page component
  * Allows users to upload and manage SNMP MIB files
+ * Uses toast notifications for success and error messages
  */
 const MIBUpload = () => {
   const [mibs, setMibs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const { showToast } = useToast();
 
   useEffect(() => {
     loadMibs();
@@ -38,7 +38,7 @@ const MIBUpload = () => {
       const data = await configApi.getMibs();
       setMibs(data.mibs || data || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load MIBs');
+      showToast(err.response?.data?.message || 'Failed to load MIBs', { type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -49,15 +49,13 @@ const MIBUpload = () => {
     if (!file) return;
 
     setUploading(true);
-    setError('');
-    setSuccess('');
 
     try {
       await configApi.uploadMib(file);
-      setSuccess(`MIB file "${file.name}" uploaded successfully`);
+      showToast(`MIB file "${file.name}" uploaded successfully`, { type: 'success' });
       loadMibs();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to upload MIB');
+      showToast(err.response?.data?.message || 'Failed to upload MIB', { type: 'error' });
     } finally {
       setUploading(false);
       event.target.value = '';
@@ -71,10 +69,10 @@ const MIBUpload = () => {
 
     try {
       await configApi.deleteMib(mibId);
-      setSuccess('MIB deleted successfully');
+      showToast('MIB deleted successfully', { type: 'success' });
       loadMibs();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete MIB');
+      showToast(err.response?.data?.message || 'Failed to delete MIB', { type: 'error' });
     }
   };
 
@@ -86,18 +84,6 @@ const MIBUpload = () => {
       <Typography variant="body2" color="textSecondary" paragraph>
         Upload SNMP MIB files for OID translation and parameter discovery
       </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
-
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
-          {success}
-        </Alert>
-      )}
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>

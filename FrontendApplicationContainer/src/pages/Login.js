@@ -8,20 +8,22 @@ import {
   TextField,
   Button,
   Typography,
-  Alert,
   CircularProgress,
 } from '@mui/material';
 import { loginUser, clearError } from '../store/slices/authSlice';
+import useToast from '../hooks/useToast';
 
 // PUBLIC_INTERFACE
 /**
  * Login page component
  * Handles user authentication with email and password
+ * Uses toast notifications for error messages
  */
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error, isAuthenticated } = useSelector((state) => state.auth);
+  const { showToast } = useToast();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -33,6 +35,13 @@ const Login = () => {
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (error) {
+      showToast(error, { type: 'error' });
+      dispatch(clearError());
+    }
+  }, [error, showToast, dispatch]);
 
   useEffect(() => {
     return () => {
@@ -69,12 +78,6 @@ const Login = () => {
           <Typography component="h2" variant="h5" align="center" gutterBottom>
             Sign In
           </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
-              {error}
-            </Alert>
-          )}
 
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
             <TextField

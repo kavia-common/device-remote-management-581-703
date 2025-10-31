@@ -8,20 +8,22 @@ import {
   TextField,
   Button,
   Typography,
-  Alert,
   CircularProgress,
 } from '@mui/material';
 import { registerUser, clearError } from '../store/slices/authSlice';
+import useToast from '../hooks/useToast';
 
 // PUBLIC_INTERFACE
 /**
  * Registration page component
  * Handles new user registration
+ * Uses toast notifications for error and success messages
  */
 const Register = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error } = useSelector((state) => state.auth);
+  const { showToast } = useToast();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -32,6 +34,13 @@ const Register = () => {
 
   const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (error) {
+      showToast(error, { type: 'error' });
+      dispatch(clearError());
+    }
+  }, [error, showToast, dispatch]);
 
   useEffect(() => {
     return () => {
@@ -53,11 +62,13 @@ const Register = () => {
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setFormError('Passwords do not match');
+      showToast('Passwords do not match', { type: 'error' });
       return;
     }
 
     if (formData.password.length < 6) {
       setFormError('Password must be at least 6 characters');
+      showToast('Password must be at least 6 characters', { type: 'error' });
       return;
     }
 
@@ -69,6 +80,7 @@ const Register = () => {
 
     if (registerUser.fulfilled.match(result)) {
       setSuccess(true);
+      showToast('Registration successful! Redirecting to login...', { type: 'success', duration: 2000 });
       setTimeout(() => {
         navigate('/login');
       }, 2000);
@@ -92,18 +104,6 @@ const Register = () => {
           <Typography component="h2" variant="h5" align="center" gutterBottom>
             Sign Up
           </Typography>
-
-          {(error || formError) && (
-            <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
-              {error || formError}
-            </Alert>
-          )}
-
-          {success && (
-            <Alert severity="success" sx={{ mt: 2, mb: 2 }}>
-              Registration successful! Redirecting to login...
-            </Alert>
-          )}
 
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
             <TextField
