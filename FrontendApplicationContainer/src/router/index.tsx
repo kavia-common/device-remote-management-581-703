@@ -13,7 +13,7 @@ import Profile from '../pages/Settings/Profile';
 import { ProtectedRoute } from '../components/common/ProtectedRoute';
 
 // PUBLIC_INTERFACE
-export function AppRouter(): JSX.Element {
+export default function AppRouter(): JSX.Element {
   /**
    * Defines all application routes. Public routes are accessible without auth,
    * protected routes require authenticated state via ProtectedRoute.
@@ -95,6 +95,3 @@ export function AppRouter(): JSX.Element {
     </Routes>
   );
 }
-
-export default AppRouter;
-export { AppRouter };

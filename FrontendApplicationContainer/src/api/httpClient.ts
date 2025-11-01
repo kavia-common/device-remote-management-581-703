@@ -13,8 +13,9 @@ const http = axios.create({
 http.interceptors.request.use((config) => {
   const state: RootState = store.getState();
   const token = state.auth.accessToken;
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    config.headers = config.headers ?? {};
+    (config.headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
   return config;
 });
@@ -26,7 +27,7 @@ let pendingRequests: Array<() => void> = [];
 http.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error?.config ?? {};
 
     if (error?.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
@@ -60,18 +61,26 @@ http.interceptors.response.use(
 
         if (newAccessToken) {
           store.dispatch(setAccessToken(newAccessToken));
+          originalRequest.headers = originalRequest.headers ?? {};
           originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
           pendingRequests.forEach((resolve) => resolve());
           pendingRequests = [];
           return http(originalRequest);
         } else {
           store.dispatch(logout());
+          return Promise.reject(error);
         }
       } catch (e) {
         store.dispatch(logout());
+        return Promise.reject(error);
       } finally {
         isRefreshing = false;
       }
+    }
+
+    // For other 401s (e.g., if already retried), perform logout as a safeguard
+    if (error?.response?.status === 401) {
+      store.dispatch(logout());
     }
 
     return Promise.reject(error);

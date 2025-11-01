@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Location } from 'react-router-dom';
 
 type LocationState = { from?: Location };
 
@@ -8,8 +8,8 @@ const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as LocationState;
-  const from = (state?.from as any)?.pathname || '/dashboard';
+  const state = location.state as LocationState | null;
+  const from = (state?.from as unknown as { pathname?: string })?.pathname || '/dashboard';
 
   const [email, setEmail] = useState('demo@acme.io');
   const [password, setPassword] = useState('password');
