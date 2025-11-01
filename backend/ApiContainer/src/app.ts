@@ -352,26 +352,26 @@ api.get('/jobs/:id', async (req: Request, res: Response) => {
   return res.json(job);
 });
 
-// ====================== PROTOCOL PLACEHOLDERS ======================
-api.post('/protocols/snmp', async (_req: Request, res: Response) => {
-  /** Accepts SNMP operation request; returns a queued job id (stub). */
-  return res.status(202).json({ jobId: 'snmp-' + Date.now() });
-});
+import snmpRouter from './routes/protocols/snmp';
+import webpaRouter from './routes/protocols/webpa';
+import tr69Router from './routes/protocols/tr69';
+import tr369Router from './routes/protocols/tr369';
 
-api.post('/protocols/webpa', async (_req: Request, res: Response) => {
-  /** Accepts WebPA operation request; returns a queued job id (stub). */
-  return res.status(202).json({ jobId: 'webpa-' + Date.now() });
-});
-
-api.post('/protocols/tr69', async (_req: Request, res: Response) => {
-  /** Accepts TR69 operation request; returns a queued job id (stub). */
-  return res.status(202).json({ jobId: 'tr69-' + Date.now() });
-});
-
-api.post('/protocols/tr369', async (_req: Request, res: Response) => {
-  /** Accepts TR369 operation request; returns a queued job id (stub). */
-  return res.status(202).json({ jobId: 'tr369-' + Date.now() });
-});
+// ====================== PROTOCOL ROUTES ======================
+/**
+ * PUBLIC_INTERFACE
+ * Protocol operation routers:
+ *  - SNMP:     /protocols/snmp/{get,set,walk}
+ *  - WebPA:    /protocols/webpa/{get,set}
+ *  - TR-069:   /protocols/tr69/{get,set}
+ *  - TR-369:   /protocols/tr369/{get,set}
+ *
+ * All endpoints return 202 Accepted with { jobId } after enqueuing.
+ */
+api.use('/protocols/snmp', snmpRouter);
+api.use('/protocols/webpa', webpaRouter);
+api.use('/protocols/tr69', tr69Router);
+api.use('/protocols/tr369', tr369Router);
 
 // Mount base path
 app.use(env.API_BASE_PATH, api);

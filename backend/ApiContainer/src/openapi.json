@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Device Remote Management - Backend API",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "RESTful API for the Device Remote Management platform. Serves operations across SNMP, WebPA, TR69/ACS, and TR369/USP with multi-tenant isolation.",
     "contact": {
       "name": "API Support",
@@ -239,36 +239,88 @@
         }
       }
     },
-    "/protocols/snmp": {
+    "/protocols/snmp/get": {
       "post": {
-        "summary": "Queue SNMP operation (placeholder)",
+        "summary": "Queue SNMP GET operation",
+        "description": "Validates SNMP GET request and enqueues a job. Returns a jobId.",
         "tags": ["SNMP Protocol"],
         "security": [{ "BearerAuth": [] }],
-        "responses": { "202": { "description": "Queued" }, "401": { "description": "Unauthorized" } }
+        "requestBody": { "$ref": "#/components/requestBodies/SnmpOperationGet" },
+        "responses": { "202": { "$ref": "#/components/responses/EnqueueAccepted" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
-    "/protocols/webpa": {
+    "/protocols/snmp/set": {
       "post": {
-        "summary": "Queue WebPA operation (placeholder)",
+        "summary": "Queue SNMP SET operation",
+        "description": "Validates SNMP SET request and enqueues a job. Returns a jobId.",
+        "tags": ["SNMP Protocol"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "$ref": "#/components/requestBodies/SnmpOperationSet" },
+        "responses": { "202": { "$ref": "#/components/responses/EnqueueAccepted" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/protocols/snmp/walk": {
+      "post": {
+        "summary": "Queue SNMP WALK operation",
+        "description": "Validates SNMP WALK request and enqueues a job. Returns a jobId.",
+        "tags": ["SNMP Protocol"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "$ref": "#/components/requestBodies/SnmpOperationWalk" },
+        "responses": { "202": { "$ref": "#/components/responses/EnqueueAccepted" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/protocols/webpa/get": {
+      "post": {
+        "summary": "Queue WebPA GET operation",
         "tags": ["WebPA Protocol"],
         "security": [{ "BearerAuth": [] }],
-        "responses": { "202": { "description": "Queued" }, "401": { "description": "Unauthorized" } }
+        "requestBody": { "$ref": "#/components/requestBodies/WebpaGet" },
+        "responses": { "202": { "$ref": "#/components/responses/EnqueueAccepted" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
-    "/protocols/tr69": {
+    "/protocols/webpa/set": {
       "post": {
-        "summary": "Queue TR69 operation (placeholder)",
+        "summary": "Queue WebPA SET operation",
+        "tags": ["WebPA Protocol"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "$ref": "#/components/requestBodies/WebpaSet" },
+        "responses": { "202": { "$ref": "#/components/responses/EnqueueAccepted" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/protocols/tr69/get": {
+      "post": {
+        "summary": "Queue TR69 GetParameterValues",
         "tags": ["TR69 Protocol"],
         "security": [{ "BearerAuth": [] }],
-        "responses": { "202": { "description": "Queued" }, "401": { "description": "Unauthorized" } }
+        "requestBody": { "$ref": "#/components/requestBodies/Tr69Get" },
+        "responses": { "202": { "$ref": "#/components/responses/EnqueueAccepted" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
-    "/protocols/tr369": {
+    "/protocols/tr69/set": {
       "post": {
-        "summary": "Queue TR369 operation (placeholder)",
+        "summary": "Queue TR69 SetParameterValues",
+        "tags": ["TR69 Protocol"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "$ref": "#/components/requestBodies/Tr69Set" },
+        "responses": { "202": { "$ref": "#/components/responses/EnqueueAccepted" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/protocols/tr369/get": {
+      "post": {
+        "summary": "Queue TR369 Get command",
         "tags": ["TR369 Protocol"],
         "security": [{ "BearerAuth": [] }],
-        "responses": { "202": { "description": "Queued" }, "401": { "description": "Unauthorized" } }
+        "requestBody": { "$ref": "#/components/requestBodies/Tr369Get" },
+        "responses": { "202": { "$ref": "#/components/responses/EnqueueAccepted" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/protocols/tr369/set": {
+      "post": {
+        "summary": "Queue TR369 Set command",
+        "tags": ["TR369 Protocol"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "$ref": "#/components/requestBodies/Tr369Set" },
+        "responses": { "202": { "$ref": "#/components/responses/EnqueueAccepted" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     }
   },
@@ -279,6 +331,202 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "description": "JWT authentication token"
+      }
+    },
+    "schemas": {
+      "SnmpCommon": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "description": "Target host or IP" },
+          "version": { "type": "string", "enum": ["v2c","v3"] },
+          "community": { "type": "string", "description": "SNMP community for v2c" },
+          "username": { "type": "string", "description": "SNMP v3 username" },
+          "authProtocol": { "type": "string", "enum": ["none","MD5","SHA"], "default": "none" },
+          "authPassword": { "type": "string" },
+          "privProtocol": { "type": "string", "enum": ["none","DES","AES"], "default": "none" },
+          "privPassword": { "type": "string" },
+          "oids": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        },
+        "required": ["target","version","oids"]
+      },
+      "WebpaBase": {
+        "type": "object",
+        "properties": {
+          "deviceId": { "type": "string" },
+          "parameters": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        },
+        "required": ["deviceId","parameters"]
+      },
+      "Tr69Base": {
+        "type": "object",
+        "properties": {
+          "deviceId": { "type": "string" },
+          "parameters": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        },
+        "required": ["deviceId","parameters"]
+      },
+      "Tr369Base": {
+        "type": "object",
+        "properties": {
+          "endpointId": { "type": "string" },
+          "parameters": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        },
+        "required": ["endpointId","parameters"]
+      },
+      "EnqueueResponse": {
+        "type": "object",
+        "properties": { "jobId": { "type": "string" } },
+        "required": ["jobId"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code","message","timestamp"],
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "details": { "oneOf": [ { "type": "array", "items": { "type": "string" } }, { "type": "object" } ] },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "path": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "requestBodies": {
+      "SnmpOperationGet": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/SnmpCommon" },
+                { "type": "object", "properties": { "operation": { "type": "string", "enum": ["get"] } }, "required": ["operation"] }
+              ]
+            }
+          }
+        }
+      },
+      "SnmpOperationSet": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/SnmpCommon" },
+                { "type": "object", "properties": { "operation": { "type": "string", "enum": ["set"] }, "values": { "type": "object" } }, "required": ["operation","values"] }
+              ]
+            }
+          }
+        }
+      },
+      "SnmpOperationWalk": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/SnmpCommon" },
+                { "type": "object", "properties": { "operation": { "type": "string", "enum": ["walk"] } }, "required": ["operation"] }
+              ]
+            }
+          }
+        }
+      },
+      "WebpaGet": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/WebpaBase" },
+                { "type": "object", "properties": { "action": { "type": "string", "enum": ["get"] } }, "required": ["action"] }
+              ]
+            }
+          }
+        }
+      },
+      "WebpaSet": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/WebpaBase" },
+                { "type": "object", "properties": { "action": { "type": "string", "enum": ["set"] }, "values": { "type": "object" } }, "required": ["action","values"] }
+              ]
+            }
+          }
+        }
+      },
+      "Tr69Get": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/Tr69Base" },
+                { "type": "object", "properties": { "action": { "type": "string", "enum": ["GetParameterValues"] } }, "required": ["action"] }
+              ]
+            }
+          }
+        }
+      },
+      "Tr69Set": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/Tr69Base" },
+                { "type": "object", "properties": { "action": { "type": "string", "enum": ["SetParameterValues"] }, "values": { "type": "object" } }, "required": ["action","values"] }
+              ]
+            }
+          }
+        }
+      },
+      "Tr369Get": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/Tr369Base" },
+                { "type": "object", "properties": { "command": { "type": "string", "enum": ["Get"] } }, "required": ["command"] }
+              ]
+            }
+          }
+        }
+      },
+      "Tr369Set": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/Tr369Base" },
+                { "type": "object", "properties": { "command": { "type": "string", "enum": ["Set"] }, "payload": { "type": "object" } }, "required": ["command","payload"] }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid input data or validation errors",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid authentication token",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "EnqueueAccepted": {
+        "description": "Job enqueued",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnqueueResponse" } } }
       }
     }
   }
