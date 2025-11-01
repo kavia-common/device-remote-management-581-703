@@ -2,39 +2,76 @@
 
 This container provides a PostgreSQL database and initializes the core schema for the multi-tenant Device Remote Management platform.
 
-Contents:
-- Dockerfile: Builds a Postgres image with init scripts
-- docker-compose.yml: Local development orchestration (optional usage)
-- init/01_init.sql: Database, roles, schemas
-- migrations/001_initial_schema.sql: Tables and indexes for:
-  tenants, users, devices, device_credentials, jobs, job_events, protocol_results, refresh_tokens, audit_logs, mib_store, tr181_params
+Directory layout (all paths relative to backend/DatabaseContainer):
+- Dockerfile — Builds a Postgres 16 image with init scripts
+- docker-compose.yml — Local development orchestration
+- .env.example — Example environment file with required variables
+- init/
+  - 01_init.sql — Creates application DB, role, schema and extensions
+  - 02_001_initial_schema.sql — Creates core tables and triggers
+- migrations/
+  - README.md — Guidance for future migrations
 
 Quick start (local dev):
-1) Ensure environment variables (see .env.example) are set in your orchestrator
-2) docker compose up -d
+1) Copy .env.example to .env and adjust as needed.
+2) Start the database:
+   docker compose --env-file .env up -d
+3) Health check:
+   docker compose ps
+   docker compose logs -f db
+4) Connect with psql:
+   psql "postgresql://APP_DB_USER:APP_DB_PASSWORD@localhost:POSTGRES_PORT/APP_DB_NAME"
+   Example:
+   psql "postgresql://drm_user:drm_password@localhost:5432/drm_app"
 
-Security and configuration:
-- Do not hardcode secrets. Use environment variables:
-  POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_PORT, APP_DB_NAME, APP_DB_USER, APP_DB_PASSWORD
-- The init scripts will create the application database/user distinct from the superuser.
+Environment variables:
+- POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_PORT
+- APP_DB_NAME, APP_DB_USER, APP_DB_PASSWORD
+- DATABASE_URL — Standard DSN for backend services (do not hardcode in code)
 
-Migrations:
-- The init directory runs only on first database initialization (mounted to /docker-entrypoint-initdb.d).
-- After first start, apply schema changes via a migrations tool (e.g., sqitch, flyway, or Prisma). A basic SQL migration is included to bootstrap.
+Standard DATABASE_URL format:
+postgresql://USER:PASSWORD@HOST:PORT/DBNAME
+Examples:
+- Local host access: postgresql://drm_user:drm_password@localhost:5432/drm_app
+- Inside compose network (service name "db"): postgresql://drm_user:drm_password@db:5432/drm_app
 
-Schema overview (multi-tenant):
-- tenants: Organizations
-- users: Platform users with tenant scoping
-- devices: Managed devices scoped to tenants
-- device_credentials: Protocol creds per device
-- jobs: Asynchronous operations (protocol jobs)
-- job_events: Per-job event logs and status updates
-- protocol_results: Results of protocol executions
-- refresh_tokens: Auth refresh tokens
-- audit_logs: System activity audit trail
-- mib_store: Uploaded or parsed MIB modules contents/metadata
-- tr181_params: TR-181 parameter metadata
+Backend integration:
+- Backend services should read DATABASE_URL from environment (e.g., using a .env file or orchestration).
+- Do not store credentials in source code.
+- Default schema is "app"; search_path is configured to "app, public" for APP_DB_USER.
+
+Initialization and migrations:
+- Files in init/ run once on the first initialization of the database volume (mounted to /docker-entrypoint-initdb.d).
+- After initial bootstrap, manage schema changes with a migration tool (Flyway, Sqitch, Prisma, etc.) and place SQL scripts under migrations/.
+- See migrations/README.md for recommendations.
+
+Core schema (multi-tenant):
+- tenants — Organizations (id, name, slug)
+- users — Users scoped by tenant; unique (tenant_id, email)
+- devices — Managed devices; unique (tenant_id, identifier)
+- device_credentials — Per-device, per-protocol credentials; unique (tenant_id, device_id, protocol)
+- jobs — Async protocol jobs with status, parameters, results
+- job_events — Timeline events tied to jobs
+- protocol_results — Flattened results for queryability
+- refresh_tokens — Auth refresh tokens with expiry and revoke fields
+- audit_logs — Activity audit trail
+- mib_store — MIB modules storage (raw text + metadata)
+- tr181_params — TR-181 parameter catalog and metadata
 
 Networking:
-- Default port: 5432 (configurable via POSTGRES_PORT)
-- Exposed only within docker-compose unless otherwise configured
+- Default port: 5432 (configurable via POSTGRES_PORT).
+- Exposed to host via docker-compose for local development.
+
+Security notes:
+- Use strong passwords for POSTGRES_PASSWORD and APP_DB_PASSWORD in non-dev environments.
+- Restrict host port exposure in production or run behind a private network.
+- Grant application only required privileges; superuser is not used by the app.
+
+Troubleshooting:
+- If init scripts did not run, remove the persistent volume and start again:
+  docker compose down -v
+  docker compose up -d
+- Verify the schema exists:
+  psql "$DATABASE_URL" -c '\dn'
+- Verify tables:
+  psql "$DATABASE_URL" -c '\dt app.*'
