@@ -24,6 +24,15 @@ Quick start (local dev):
    Example:
    psql "postgresql://drm_user:drm_password@localhost:5432/drm_app"
 
+Seed data (development/demo)
+- Export host DSN:
+  export DATABASE_URL="postgresql://drm_user:drm_password@localhost:5432/drm_app"
+- Apply seeds:
+  psql "$DATABASE_URL" -f device-remote-management-581-703/backend/DatabaseContainer/seed/001_seed_tenant.sql
+  psql "$DATABASE_URL" -f device-remote-management-581-703/backend/DatabaseContainer/seed/002_seed_admin_user.sql
+  psql "$DATABASE_URL" -f device-remote-management-581-703/backend/DatabaseContainer/seed/003_seed_devices.sql
+- Credentials: admin@acme.io / Admin!234
+
 Environment variables:
 - POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_PORT
 - APP_DB_NAME, APP_DB_USER, APP_DB_PASSWORD

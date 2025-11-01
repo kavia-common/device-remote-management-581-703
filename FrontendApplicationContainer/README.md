@@ -32,7 +32,7 @@ It correctly bundles React in production mode and optimizes the build for the be
 Copy `.env.example` to `.env` and adjust values as needed:
 
 Variables:
-- `REACT_APP_API_BASE_URL` — Backend API base URL. Defaults to `http://localhost:8080/api/v1` if not set.
+- `REACT_APP_API_BASE_URL` — Backend API base URL. Set to `http://localhost:8080/api/v1` for local development.
 - `REACT_APP_ENV` — Environment name (e.g., development, staging, production). Default: `development`.
 - `REACT_APP_POLL_INTERVAL_MS` — Default polling interval in ms for hooks like jobs polling. Default: `10000`.
 - `REACT_APP_FEATURE_FLAGS` — Feature flags either as JSON (e.g., `{"newJobUI":true}`) or CSV (e.g., `newJobUI,snmpV3`). Default: none.
@@ -41,6 +41,11 @@ Tip for local overrides without committing secrets:
 - Create `.env.development.local` in this folder. CRA will load it in development and it is typically gitignored by default toolchains.
 
 The app reads these in `src/api/config.ts`.
+
+End-to-end quick check (see workspace README for full steps):
+- Backend running at http://localhost:8080 with CORS_ORIGIN=http://localhost:3000
+- Login using admin@acme.io / Admin!234
+- Devices list shows seeded devices; create an SNMP GET job and monitor in Jobs.
 
 ## Customization
 

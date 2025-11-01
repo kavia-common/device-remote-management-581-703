@@ -45,34 +45,22 @@ function parsePollInterval(raw: string | undefined): number {
 }
 
 // PUBLIC_INTERFACE
-export function getApiBaseUrl(): string {
-  /**
-   * Returns API base URL from environment variable or default local URL.
-   * Uses CRA environment variables (REACT_APP_*).
-   */
-  return process.env.REACT_APP_API_BASE_URL || DEFAULT_API_BASE;
-}
+export const API_BASE_URL: string =
+  process.env.REACT_APP_API_BASE_URL || DEFAULT_API_BASE;
 
 // PUBLIC_INTERFACE
-export function getEnvName(): string {
-  /**
-   * Returns the app environment name from REACT_APP_ENV with 'development' default.
-   */
-  return process.env.REACT_APP_ENV || DEFAULT_ENV;
-}
+export const ENV: string = process.env.REACT_APP_ENV || DEFAULT_ENV;
 
 // PUBLIC_INTERFACE
-export function getDefaultPollIntervalMs(): number {
-  /**
-   * Returns default polling interval (ms) from REACT_APP_POLL_INTERVAL_MS or sensible default.
-   */
-  return parsePollInterval(process.env.REACT_APP_POLL_INTERVAL_MS);
-}
+export const POLL_INTERVAL_MS: number = parsePollInterval(
+  process.env.REACT_APP_POLL_INTERVAL_MS
+);
+
+// PUBLIC_INTERFACE
+export const FEATURE_FLAGS_RAW: string = process.env.REACT_APP_FEATURE_FLAGS || '';
 
 // PUBLIC_INTERFACE
 export function getFeatureFlags(): Record<string, boolean> {
-  /**
-   * Returns feature flags parsed from REACT_APP_FEATURE_FLAGS (JSON or CSV), default {}.
-   */
-  return parseFeatureFlags(process.env.REACT_APP_FEATURE_FLAGS);
+  /** Returns feature flags parsed from REACT_APP_FEATURE_FLAGS (JSON or CSV), default {}. */
+  return parseFeatureFlags(FEATURE_FLAGS_RAW);
 }
