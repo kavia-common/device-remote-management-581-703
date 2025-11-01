@@ -27,6 +27,21 @@ Launches the test runner in interactive watch mode.
 Builds the app for production to the `build` folder.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
 
+## Environment Configuration
+
+Copy `.env.example` to `.env` and adjust values as needed:
+
+Variables:
+- `REACT_APP_API_BASE_URL` — Backend API base URL. Defaults to `http://localhost:8080/api/v1` if not set.
+- `REACT_APP_ENV` — Environment name (e.g., development, staging, production). Default: `development`.
+- `REACT_APP_POLL_INTERVAL_MS` — Default polling interval in ms for hooks like jobs polling. Default: `10000`.
+- `REACT_APP_FEATURE_FLAGS` — Feature flags either as JSON (e.g., `{"newJobUI":true}`) or CSV (e.g., `newJobUI,snmpV3`). Default: none.
+
+Tip for local overrides without committing secrets:
+- Create `.env.development.local` in this folder. CRA will load it in development and it is typically gitignored by default toolchains.
+
+The app reads these in `src/api/config.ts`.
+
 ## Customization
 
 ### Colors

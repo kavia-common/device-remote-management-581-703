@@ -18,5 +18,8 @@ export interface JwtTokens {
 declare namespace NodeJS {
   interface ProcessEnv {
     readonly REACT_APP_API_BASE_URL?: string;
+    readonly REACT_APP_ENV?: 'development' | 'staging' | 'production' | string;
+    readonly REACT_APP_POLL_INTERVAL_MS?: string;
+    readonly REACT_APP_FEATURE_FLAGS?: string;
   }
 }
