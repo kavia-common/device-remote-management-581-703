@@ -1,0 +1,136 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Device Remote Management - Backend API",
+    "version": "1.0.0",
+    "description": "RESTful API for the Device Remote Management platform. Serves operations across SNMP, WebPA, TR69/ACS, and TR369/USP with multi-tenant isolation.",
+    "contact": {
+      "name": "API Support",
+      "email": "api-support@devicemanagement.com"
+    },
+    "license": {
+      "name": "Proprietary"
+    }
+  },
+  "servers": [
+    { "url": "http://localhost:8080/api/v1", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Help & Metadata", "description": "Health and metadata" },
+    { "name": "Authentication", "description": "Login and token management" },
+    { "name": "Jobs", "description": "Asynchronous operations" },
+    { "name": "SNMP Protocol", "description": "SNMP operations" },
+    { "name": "WebPA Protocol", "description": "WebPA operations" },
+    { "name": "TR69 Protocol", "description": "TR69/ACS operations" },
+    { "name": "TR369 Protocol", "description": "TR369/USP operations" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "description": "Returns liveness and integration presence.",
+        "tags": ["Help & Metadata"],
+        "responses": {
+          "200": {
+            "description": "Service healthy"
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "User login (stub)",
+        "description": "Validates credentials and returns JWT tokens (demo implementation).",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "email": { "type": "string" }, "password": { "type": "string" } }, "required": ["email","password"] }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login success",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": {
+                  "accessToken": { "type": "string" },
+                  "refreshToken": { "type": "string" },
+                  "user": { "type": "object" }
+                } } }
+            }
+          },
+          "400": { "description": "Invalid request" }
+        }
+      }
+    },
+    "/jobs": {
+      "get": {
+        "summary": "List jobs (placeholder)",
+        "tags": ["Jobs"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Jobs list" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/jobs/{id}": {
+      "get": {
+        "summary": "Get job by id (placeholder)",
+        "tags": ["Jobs"],
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Job detail" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/protocols/snmp": {
+      "post": {
+        "summary": "Queue SNMP operation (placeholder)",
+        "tags": ["SNMP Protocol"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "202": { "description": "Queued" }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/protocols/webpa": {
+      "post": {
+        "summary": "Queue WebPA operation (placeholder)",
+        "tags": ["WebPA Protocol"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "202": { "description": "Queued" }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/protocols/tr69": {
+      "post": {
+        "summary": "Queue TR69 operation (placeholder)",
+        "tags": ["TR69 Protocol"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "202": { "description": "Queued" }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/protocols/tr369": {
+      "post": {
+        "summary": "Queue TR369 operation (placeholder)",
+        "tags": ["TR369 Protocol"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "202": { "description": "Queued" }, "401": { "description": "Unauthorized" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT authentication token"
+      }
+    }
+  }
+}
