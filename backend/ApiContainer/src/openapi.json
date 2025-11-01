@@ -217,23 +217,25 @@
     },
     "/jobs": {
       "get": {
-        "summary": "List jobs (placeholder)",
+        "summary": "List jobs",
+        "description": "Returns the current tenant's jobs with live status and progress from the queue backend (Redis or in-memory).",
         "tags": ["Jobs"],
         "security": [{ "BearerAuth": [] }],
         "responses": {
-          "200": { "description": "Jobs list" },
+          "200": { "description": "Jobs list with live status" },
           "401": { "description": "Unauthorized" }
         }
       }
     },
     "/jobs/{id}": {
       "get": {
-        "summary": "Get job by id (placeholder)",
+        "summary": "Get job by id",
+        "description": "Returns job details including status, progress, and protocol results if available.",
         "tags": ["Jobs"],
         "security": [{ "BearerAuth": [] }],
         "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
         "responses": {
-          "200": { "description": "Job detail" },
+          "200": { "description": "Job detail with status and results" },
           "401": { "description": "Unauthorized" },
           "404": { "description": "Not found" }
         }

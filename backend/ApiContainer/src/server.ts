@@ -1,5 +1,6 @@
 import app from './app';
 import { env } from './config/env';
+import { startWorkers, getQueueMode } from './queue';
 
 /**
  * PUBLIC_INTERFACE
@@ -7,9 +8,17 @@ import { env } from './config/env';
  */
 export function startServer() {
   /** Binds Express app to PORT and logs startup details. */
+  // Fire and forget worker startup (no-op in memory mode)
+  startWorkers().catch((e) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to start workers:', e);
+  });
+
   const server = app.listen(env.PORT, () => {
     // eslint-disable-next-line no-console
-    console.log(`API listening on port ${env.PORT} at base ${env.API_BASE_PATH}. Swagger UI: http://localhost:${env.PORT}/docs`);
+    console.log(
+      `API listening on port ${env.PORT} at base ${env.API_BASE_PATH}. Swagger UI: http://localhost:${env.PORT}/docs. Queue mode: ${getQueueMode()}`
+    );
   });
   return server;
 }

@@ -324,29 +324,31 @@ api.delete('/devices/:id', async (req: Request, res: Response) => {
   return res.status(204).send();
 });
 
-// ====================== JOBS ======================
+ // ====================== JOBS ======================
 
 /**
  * PUBLIC_INTERFACE
- * GET /jobs - Lists jobs for tenant (placeholder).
+ * GET /jobs - Lists jobs for tenant with live statuses.
  */
 api.get('/jobs', async (req: Request, res: Response) => {
   /**
-   * Returns placeholder job list filtered by tenant.
+   * Returns queued/running/completed jobs filtered by tenant from queue job store.
    */
   const tenantId = (req as any).tenant || (req.user as any)?.tenantId;
-  const list = tenantId ? mem.jobs.filter((j) => j.tenantId === tenantId) : mem.jobs;
+  const { listJobs } = await import('./queue');
+  const list = listJobs({ tenantId });
   return res.json(list);
 });
 
 /**
  * PUBLIC_INTERFACE
- * GET /jobs/:id - Returns job detail (placeholder).
+ * GET /jobs/:id - Returns job detail and results.
  */
 api.get('/jobs/:id', async (req: Request, res: Response) => {
   const tenantId = (req as any).tenant || (req.user as any)?.tenantId;
-  const job = mem.jobs.find((j) => j.id === req.params.id && (!tenantId || j.tenantId === tenantId));
-  if (!job) {
+  const { getJob } = await import('./queue');
+  const job = getJob(req.params.id);
+  if (!job || (tenantId && job.tenantId !== tenantId)) {
     return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Job not found', timestamp: new Date().toISOString(), path: req.originalUrl } });
   }
   return res.json(job);
