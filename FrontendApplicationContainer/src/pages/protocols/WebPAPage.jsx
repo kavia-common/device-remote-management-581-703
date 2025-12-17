@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   Card,
   CardContent,
@@ -28,7 +28,9 @@ import DownloadIcon from '@mui/icons-material/Download';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { webpaGetParameter, webpaSetParameter } from '../../api/protocols/webpa';
 import { showSnackbar } from '../../store/uiSlice';
+import { selectUser } from '../../store/authSlice';
 import { exportJSON, exportCSV } from '../../utils/exporters';
+import { buildQueryRecord, createQueryLog } from '../../api/activity';
 
 const STORAGE_KEY = 'webpa_form_values';
 
@@ -90,6 +92,8 @@ function WebPAPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const user = useSelector(selectUser);
+
   const handleExecute = async () => {
     if (!validate()) {
       dispatch(showSnackbar({ message: 'Please fix validation errors', severity: 'error' }));
@@ -100,8 +104,11 @@ function WebPAPage() {
     setError(null);
     setResults(null);
 
+    const startTime = Date.now();
+    let result;
+    let executionError = null;
+
     try {
-      let result;
       if (operation === 0) {
         // GET
         result = await webpaGetParameter({ deviceId, parameter });
@@ -112,11 +119,37 @@ function WebPAPage() {
       setResults(result);
       dispatch(showSnackbar({ message: 'Operation completed successfully', severity: 'success' }));
     } catch (err) {
-      const errorMessage = err.response?.data?.error?.message || err.message || 'Operation failed';
-      setError(errorMessage);
-      dispatch(showSnackbar({ message: errorMessage, severity: 'error' }));
+      executionError = err.response?.data?.error?.message || err.message || 'Operation failed';
+      setError(executionError);
+      dispatch(showSnackbar({ message: executionError, severity: 'error' }));
     } finally {
+      const duration = Date.now() - startTime;
       setLoading(false);
+
+      // Log to query history (non-blocking)
+      const operationName = operation === 0 ? 'GET' : 'SET';
+      const actionName = operation === 0 ? 'webpaGetParameter' : 'webpaSetParameter';
+      const params = operation === 0 
+        ? { parameter }
+        : { parameter, value, dataType };
+
+      const queryRecord = buildQueryRecord({
+        protocol: 'webpa',
+        target: deviceId,
+        deviceId,
+        action: actionName,
+        operation: operationName,
+        params,
+        status: executionError ? 'failed' : 'success',
+        duration,
+        response: result,
+        error: executionError,
+        user: user?.email || user?.username || 'unknown',
+      });
+
+      createQueryLog(queryRecord).catch(err => {
+        console.warn('Failed to log query to history:', err);
+      });
     }
   };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   Card,
   CardContent,
@@ -34,7 +34,9 @@ import DownloadIcon from '@mui/icons-material/Download';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { snmpGet, snmpSet, snmpWalk } from '../../api/protocols/snmp';
 import { showSnackbar } from '../../store/uiSlice';
+import { selectUser } from '../../store/authSlice';
 import { exportJSON, exportCSV } from '../../utils/exporters';
+import { buildQueryRecord, createQueryLog } from '../../api/activity';
 
 const STORAGE_KEY = 'snmp_form_values';
 
@@ -45,6 +47,7 @@ function SNMPPage() {
    * Provides UI for SNMP GET, SET, and WALK operations
    */
   const dispatch = useDispatch();
+  const user = useSelector(selectUser);
   const [operation, setOperation] = useState(0); // 0=GET, 1=SET, 2=WALK
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
@@ -80,7 +83,7 @@ function SNMPPage() {
   }, []);
 
   // Persist values on change
-  const persistValues = () => {
+  useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         deviceId,
@@ -92,10 +95,6 @@ function SNMPPage() {
     } catch (err) {
       console.error('Failed to persist form values:', err);
     }
-  };
-
-  useEffect(() => {
-    persistValues();
   }, [deviceId, oid, version, community, maxRepetitions]);
 
   const validate = () => {
@@ -117,8 +116,11 @@ function SNMPPage() {
     setError(null);
     setResults(null);
 
+    const startTime = Date.now();
+    let result;
+    let executionError = null;
+
     try {
-      let result;
       if (operation === 0) {
         // GET
         result = await snmpGet({ deviceId, oid, version, community });
@@ -132,11 +134,39 @@ function SNMPPage() {
       setResults(result);
       dispatch(showSnackbar({ message: 'Operation completed successfully', severity: 'success' }));
     } catch (err) {
-      const errorMessage = err.response?.data?.error?.message || err.message || 'Operation failed';
-      setError(errorMessage);
-      dispatch(showSnackbar({ message: errorMessage, severity: 'error' }));
+      executionError = err.response?.data?.error?.message || err.message || 'Operation failed';
+      setError(executionError);
+      dispatch(showSnackbar({ message: executionError, severity: 'error' }));
     } finally {
+      const duration = Date.now() - startTime;
       setLoading(false);
+
+      // Log to query history (non-blocking)
+      const operationName = operation === 0 ? 'GET' : operation === 1 ? 'SET' : 'WALK';
+      const actionName = operation === 0 ? 'snmpGet' : operation === 1 ? 'snmpSet' : 'snmpWalk';
+      const params = operation === 0 
+        ? { oid, version, community }
+        : operation === 1
+        ? { oid, value, valueType, version, community }
+        : { oid, version, community, maxRepetitions };
+
+      const queryRecord = buildQueryRecord({
+        protocol: 'snmp',
+        target: deviceId,
+        deviceId,
+        action: actionName,
+        operation: operationName,
+        params,
+        status: executionError ? 'failed' : 'success',
+        duration,
+        response: result,
+        error: executionError,
+        user: user?.email || user?.username || 'unknown',
+      });
+
+      createQueryLog(queryRecord).catch(err => {
+        console.warn('Failed to log query to history:', err);
+      });
     }
   };
 

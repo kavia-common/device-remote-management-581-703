@@ -55,8 +55,8 @@ function QueryHistory() {
   // State from URL query params
   const [page, setPage] = useState(parseInt(searchParams.get('page')) || 1);
   const [pageSize, setPageSize] = useState(parseInt(searchParams.get('pageSize')) || 20);
-  const [sortField, setSortField] = useState(searchParams.get('sortField') || 'executedAt');
-  const [sortOrder, setSortOrder] = useState(searchParams.get('sortOrder') || 'desc');
+  const [sortField] = useState(searchParams.get('sortField') || 'executedAt');
+  const [sortOrder] = useState(searchParams.get('sortOrder') || 'desc');
   const [protocolFilter, setProtocolFilter] = useState(searchParams.get('protocol') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [searchText, setSearchText] = useState(searchParams.get('search') || '');
@@ -149,22 +149,20 @@ function QueryHistory() {
   const handleRerun = (query) => {
     // Navigate to appropriate protocol page with pre-filled params
     const protocolPath = `/protocols/${query.protocol}`;
-    navigate(protocolPath, { state: { rerunQuery: query } });
+    // Pass full query record including parameters for rerun
+    navigate(protocolPath, { 
+      state: { 
+        rerunQuery: {
+          ...query,
+          deviceId: query.deviceId || query.target,
+          parameters: query.parameters,
+        }
+      } 
+    });
   };
 
   const handleExportQuery = async (query) => {
     try {
-      const exportData = [{
-        id: query.id,
-        time: query.executedAt,
-        user: query.user || 'N/A',
-        protocol: query.protocol,
-        target: query.deviceId || query.target,
-        action: query.operation || query.action,
-        parameters: JSON.stringify(query.parameters || {}),
-        status: query.status,
-        duration: query.duration ? `${query.duration}ms` : 'N/A',
-      }];
       await exportResults({
         format: 'json',
         data: query,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   Card,
   CardContent,
@@ -35,7 +35,9 @@ import {
   tr369Operate,
 } from '../../api/protocols/tr369';
 import { showSnackbar } from '../../store/uiSlice';
+import { selectUser } from '../../store/authSlice';
 import { exportJSON, exportCSV } from '../../utils/exporters';
+import { buildQueryRecord, createQueryLog } from '../../api/activity';
 
 const STORAGE_KEY = 'tr369_form_values';
 
@@ -128,6 +130,8 @@ function TR369Page() {
     return {};
   };
 
+  const user = useSelector(selectUser);
+
   const handleExecute = async () => {
     if (!validate()) {
       dispatch(showSnackbar({ message: 'Please fix validation errors', severity: 'error' }));
@@ -138,8 +142,11 @@ function TR369Page() {
     setError(null);
     setResults(null);
 
+    const startTime = Date.now();
+    let result;
+    let executionError = null;
+
     try {
-      let result;
       if (operation === 0) {
         // GET
         const pathList = parsePaths();
@@ -169,11 +176,49 @@ function TR369Page() {
       setResults(result);
       dispatch(showSnackbar({ message: 'Operation completed successfully', severity: 'success' }));
     } catch (err) {
-      const errorMessage = err.response?.data?.error?.message || err.message || 'Operation failed';
-      setError(errorMessage);
-      dispatch(showSnackbar({ message: errorMessage, severity: 'error' }));
+      executionError = err.response?.data?.error?.message || err.message || 'Operation failed';
+      setError(executionError);
+      dispatch(showSnackbar({ message: executionError, severity: 'error' }));
     } finally {
+      const duration = Date.now() - startTime;
       setLoading(false);
+
+      // Log to query history (non-blocking)
+      const operationNames = ['GET', 'SET', 'ADD', 'DELETE', 'OPERATE'];
+      const actionNames = ['tr369Get', 'tr369Set', 'tr369Add', 'tr369Delete', 'tr369Operate'];
+      const operationName = operationNames[operation];
+      const actionName = actionNames[operation];
+      
+      let params = {};
+      if (operation === 0) {
+        params = { paths: parsePaths() };
+      } else if (operation === 1) {
+        params = { parameters: parseParameters() };
+      } else if (operation === 2) {
+        params = { path: parsePaths()[0], parameters: parseParameters() };
+      } else if (operation === 3) {
+        params = { paths: parsePaths() };
+      } else if (operation === 4) {
+        params = { command, commandKey };
+      }
+
+      const queryRecord = buildQueryRecord({
+        protocol: 'tr369',
+        target: deviceId,
+        deviceId,
+        action: actionName,
+        operation: operationName,
+        params,
+        status: executionError ? 'failed' : 'success',
+        duration,
+        response: result,
+        error: executionError,
+        user: user?.email || user?.username || 'unknown',
+      });
+
+      createQueryLog(queryRecord).catch(err => {
+        console.warn('Failed to log query to history:', err);
+      });
     }
   };
 

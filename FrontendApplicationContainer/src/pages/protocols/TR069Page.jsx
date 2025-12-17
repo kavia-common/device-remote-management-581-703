@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   Card,
   CardContent,
@@ -42,7 +42,9 @@ import {
   tr069GetTaskStatus,
 } from '../../api/protocols/tr069';
 import { showSnackbar } from '../../store/uiSlice';
+import { selectUser } from '../../store/authSlice';
 import { exportJSON, exportCSV } from '../../utils/exporters';
+import { buildQueryRecord, createQueryLog } from '../../api/activity';
 
 const STORAGE_KEY = 'tr069_form_values';
 
@@ -149,6 +151,8 @@ function TR069Page() {
     }
   };
 
+  const user = useSelector(selectUser);
+
   const handleExecute = async () => {
     if (!validate()) {
       dispatch(showSnackbar({ message: 'Please fix validation errors', severity: 'error' }));
@@ -160,8 +164,11 @@ function TR069Page() {
     setResults(null);
     setTaskStatus(null);
 
+    const startTime = Date.now();
+    let result;
+    let executionError = null;
+
     try {
-      let result;
       if (operation === 0) {
         // GET
         const params = parseParameters();
@@ -193,11 +200,47 @@ function TR069Page() {
       setResults(result);
       dispatch(showSnackbar({ message: 'Operation initiated successfully', severity: 'success' }));
     } catch (err) {
-      const errorMessage = err.response?.data?.error?.message || err.message || 'Operation failed';
-      setError(errorMessage);
-      dispatch(showSnackbar({ message: errorMessage, severity: 'error' }));
+      executionError = err.response?.data?.error?.message || err.message || 'Operation failed';
+      setError(executionError);
+      dispatch(showSnackbar({ message: executionError, severity: 'error' }));
     } finally {
+      const duration = Date.now() - startTime;
       setLoading(false);
+
+      // Log to query history (non-blocking)
+      let operationName, actionName, params;
+      if (operation === 0) {
+        operationName = 'GET_PARAMETER_VALUES';
+        actionName = 'tr069GetParameterValues';
+        params = { parameters: parseParameters() };
+      } else if (operation === 1) {
+        operationName = 'SET_PARAMETER_VALUES';
+        actionName = 'tr069SetParameterValues';
+        params = { parameters: parseParameters() };
+      } else {
+        operationName = taskType === 'reboot' ? 'REBOOT' : 'DOWNLOAD';
+        actionName = taskType === 'reboot' ? 'tr069Reboot' : 'tr069Download';
+        params = taskType === 'reboot' ? {} : { fileType, url: downloadUrl };
+      }
+
+      const queryRecord = buildQueryRecord({
+        protocol: 'tr069',
+        target: deviceId,
+        deviceId,
+        action: actionName,
+        operation: operationName,
+        params,
+        status: executionError ? 'failed' : 'success',
+        duration,
+        response: result,
+        error: executionError,
+        user: user?.email || user?.username || 'unknown',
+        requestId: result?.taskId,
+      });
+
+      createQueryLog(queryRecord).catch(err => {
+        console.warn('Failed to log query to history:', err);
+      });
     }
   };
 

@@ -82,17 +82,74 @@ Configuration management
 - `saveConfigurationTemplate({ name, deviceId, protocol, parameters })` - Save template
 - `listConfigurationTemplates({ page, pageSize })` - List templates
 
-#### 9. **queries.js**
+#### 9. **activity.js**
+Activity logging and query history tracking
+- `buildQueryRecord({ protocol, target, action, params, status, duration, response, error, user, deviceId, operation, requestId })` - Build normalized query record
+- `createQueryLog(payload)` - Create query log entry (POST to /queries or localStorage fallback)
+- `createQueryResult(payload)` - Create detailed result entry (POST to /queries/:id/results)
+- `getLocalHistoryRecords()` - Retrieve local history from localStorage (mock mode)
+- `clearLocalHistory()` - Clear local history (mock mode)
+
+**Automatic Activity Logging:**
+All protocol pages (SNMP, WebPA, TR-069, TR-369) automatically log operation executions to query history:
+- Logs happen after operation completion (success or failure)
+- Non-blocking - failures to log do not affect protocol operations
+- Captures: protocol, device/target, action, parameters, status, duration, response/error, user, timestamp
+- In mock mode: persists to `localStorage` under key `dmgr.history` (max 100 entries)
+- In real mode: POSTs to backend `/queries` endpoint
+
+**QueryRecord Schema:**
+```javascript
+{
+  id: 'qry-<timestamp>-<random>',          // Unique ID
+  protocol: 'snmp|webpa|tr069|tr369',      // Protocol name
+  deviceId: 'device-id',                    // Device identifier
+  target: '192.168.1.1',                    // Target (IP/MAC/serial)
+  operation: 'GET|SET|WALK|...',            // Operation type
+  action: 'snmpGet|webpaSetParameter|...',  // Action method name
+  parameters: { ... },                      // Request parameters
+  status: 'success|failed|pending',         // Execution status
+  duration: 1234,                           // Duration in ms
+  response: { ... } | null,                 // Response payload (null if failed)
+  error: 'error message' | null,            // Error message (null if success)
+  user: 'user@example.com',                 // User who executed
+  executedAt: '2024-01-01T00:00:00Z',       // ISO timestamp
+  isFavorite: false,                        // Favorite flag
+  requestId: 'task-123' | null,             // Backend request ID if available
+  resultSummary: 'Retrieved 10 OID(s)'      // Brief result summary
+}
+```
+
+**LocalStorage Mock Fallback:**
+When `REACT_APP_API_BASE` is not set, activity logging uses localStorage:
+- Key: `dmgr.history`
+- Format: JSON array of QueryRecord objects
+- Max entries: 100 (FIFO)
+- Accessible via `getLocalHistoryRecords()` helper
+- QueryHistory page reads from this storage automatically in mock mode
+
+#### 10. **queries.js**
 Query management and history
 - `saveQuery({ name, protocol, deviceId, parameters, isFavorite })` - Save query
-- `listQueries({ page, pageSize, favorites })` - List saved queries
+- `listQueries({ page, pageSize, favorites })` - List saved queries (reads from localStorage in mock mode)
 - `getQueryById(queryId)` - Get query details
-- `deleteQuery(queryId)` - Delete query
-- `toggleFavorite(queryId, isFavorite)` - Toggle favorite
-- `getQueryHistory({ page, pageSize, protocol, deviceId, status, search, dateFrom, dateTo, sort })` - Query history with filters
+- `deleteQuery(queryId)` - Delete query (removes from localStorage in mock mode)
+- `toggleFavorite(queryId, isFavorite)` - Toggle favorite (updates localStorage in mock mode)
+- `getQueryHistory({ page, pageSize, protocol, deviceId, status, search, dateFrom, dateTo, sort })` - Query history with filters (reads from localStorage in mock mode)
 - `rerunQuery(queryId)` - Rerun a previous query
+- `addLocalQueryRecord(record)` - Add record to localStorage (helper for consistency)
 
 **Query History Endpoints:**
+- `POST /queries` - Create query log entry
+  - Body: QueryRecord payload
+  - Returns: `{ success, id, message }`
+  - **Automatic**: Called by protocol pages after each operation
+
+- `POST /queries/:id/results` - Create detailed result entry (optional)
+  - Body: `{ queryId, ...resultData }`
+  - Returns: `{ success, message }`
+  - **Note**: Only used when backend separates query metadata from results
+
 - `GET /queries/history` - Get paginated query execution history
   - Query params: `page`, `pageSize`, `protocol`, `deviceId`, `status`, `search`, `dateFrom`, `dateTo`, `sort`
   - Returns: `{ page, pageSize, totalPages, totalItems, items: [...] }`
@@ -113,18 +170,21 @@ Query management and history
 
 **Configuration Notes:**
 - All query endpoints support mock fallback when `REACT_APP_API_BASE` is not set
-- Mock mode provides realistic data with multiple protocols (SNMP, WebPA, TR-069, TR-369)
+- Mock mode stores history in localStorage (`dmgr.history`) with QueryRecord schema
+- Protocol pages automatically log all operations (SNMP, WebPA, TR-069, TR-369)
+- Logging is non-blocking - errors are console.warn'd but don't affect operations
 - Filters work in both mock and real modes
 - URL query parameters are persisted for shareable views
 - Client-side table state (page, pageSize, sort, filters) persisted in URL for deep linking
+- Rerun functionality pre-fills protocol page forms with stored parameters
 
-#### 10. **exports.js**
+#### 11. **exports.js**
 Export operations
 - `exportResults({ format, data, filename })` - Export results (CSV/JSON/XML)
 - `getExportHistory({ page, pageSize })` - Export history
 - `scheduleExport({ format, query, schedule, recipients })` - Schedule periodic exports
 
-#### 11. **mockApi.js**
+#### 12. **mockApi.js**
 Mock implementations for development
 - All mock functions return realistic data with delays
 - Auto-used when `REACT_APP_API_BASE` is not set

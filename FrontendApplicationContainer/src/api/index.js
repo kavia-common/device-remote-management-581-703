@@ -12,8 +12,16 @@ export {
   deleteQuery, 
   toggleFavorite, 
   getQueryHistory,
-  rerunQuery 
+  rerunQuery,
+  addLocalQueryRecord
 } from './queries';
+export { 
+  buildQueryRecord, 
+  createQueryLog, 
+  createQueryResult,
+  getLocalHistoryRecords,
+  clearLocalHistory
+} from './activity';
 export * from './protocols/snmp';
 export * from './protocols/webpa';
 export * from './protocols/tr069';

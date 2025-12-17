@@ -1,4 +1,5 @@
 import api, { isMockMode } from './client';
+import { getLocalHistoryRecords } from './activity';
 
 /**
  * Queries API module
@@ -46,46 +47,9 @@ export async function listQueries({ page = 1, pageSize = 10, favorites = false }
    * @returns {Promise<Object>} Paginated query list
    */
   if (isMockMode()) {
-    const allItems = [
-      {
-        id: 'qry-1',
-        name: 'Get WiFi Status',
-        protocol: 'webpa',
-        deviceId: 'dev-002',
-        parameters: { parameter: 'Device.WiFi.SSID.1.Status' },
-        isFavorite: true,
-        createdAt: new Date().toISOString(),
-        executedAt: new Date().toISOString(),
-        status: 'success',
-        user: 'admin@example.com',
-      },
-      {
-        id: 'qry-2',
-        name: 'SNMP Interface Stats',
-        protocol: 'snmp',
-        deviceId: 'dev-001',
-        parameters: { oid: '1.3.6.1.2.1.2.2.1.10', version: 'v2c' },
-        isFavorite: true,
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-        executedAt: new Date(Date.now() - 3600000).toISOString(),
-        status: 'success',
-        user: 'admin@example.com',
-      },
-      {
-        id: 'qry-3',
-        name: 'TR-069 Model Info',
-        protocol: 'tr069',
-        deviceId: 'dev-003',
-        parameters: { parameters: ['Device.DeviceInfo.ModelName'] },
-        isFavorite: false,
-        createdAt: new Date(Date.now() - 172800000).toISOString(),
-        executedAt: new Date(Date.now() - 7200000).toISOString(),
-        status: 'success',
-        user: 'operator@example.com',
-      },
-    ];
-    
-    const items = favorites ? allItems.filter(q => q.isFavorite) : allItems;
+    // Get from localStorage history and filter favorites
+    const localHistory = getLocalHistoryRecords();
+    const items = favorites ? localHistory.filter(q => q.isFavorite) : localHistory.slice(0, 20);
     
     return {
       page,
@@ -107,6 +71,10 @@ export async function getQueryById(queryId) {
    * @returns {Promise<Object>} Query details
    */
   if (isMockMode()) {
+    const localHistory = getLocalHistoryRecords();
+    const found = localHistory.find(q => q.id === queryId);
+    if (found) return found;
+    
     return {
       id: queryId,
       name: 'Sample Query',
@@ -129,6 +97,10 @@ export async function deleteQuery(queryId) {
    * @returns {Promise<Object>} Deletion result
    */
   if (isMockMode()) {
+    // Remove from localStorage
+    const localHistory = getLocalHistoryRecords();
+    const updated = localHistory.filter(q => q.id !== queryId);
+    localStorage.setItem('dmgr.history', JSON.stringify(updated));
     return {
       success: true,
       message: 'Query deleted (mock)',
@@ -147,6 +119,13 @@ export async function toggleFavorite(queryId, isFavorite) {
    * @returns {Promise<Object>} Update result
    */
   if (isMockMode()) {
+    // Update in localStorage
+    const localHistory = getLocalHistoryRecords();
+    const query = localHistory.find(q => q.id === queryId);
+    if (query) {
+      query.isFavorite = isFavorite;
+      localStorage.setItem('dmgr.history', JSON.stringify(localHistory));
+    }
     return {
       success: true,
       queryId,
@@ -184,81 +163,45 @@ export async function getQueryHistory({
    * @returns {Promise<Object>} Paginated history
    */
   if (isMockMode()) {
-    // Generate more realistic mock data
-    const mockItems = [
-      {
-        id: 'hist-1',
-        protocol: 'snmp',
-        deviceId: 'dev-001',
-        target: '192.168.1.100',
-        operation: 'GET',
-        action: 'snmpGet',
-        parameters: { oid: '1.3.6.1.2.1.1.1.0', version: 'v2c' },
-        status: 'success',
-        duration: 234,
-        user: 'admin@example.com',
-        executedAt: new Date().toISOString(),
-        response: { value: 'Linux Router 5.4.0', type: 'OctetString' },
-        isFavorite: true,
-      },
-      {
-        id: 'hist-2',
-        protocol: 'webpa',
-        deviceId: 'dev-002',
-        target: 'device-mac-123456',
-        operation: 'SET',
-        action: 'webpaSetParameter',
-        parameters: { parameter: 'Device.WiFi.SSID.1.Enable', value: 'true' },
-        status: 'success',
-        duration: 567,
-        user: 'admin@example.com',
-        executedAt: new Date(Date.now() - 3600000).toISOString(),
-        response: { success: true },
-        isFavorite: false,
-      },
-      {
-        id: 'hist-3',
-        protocol: 'tr069',
-        deviceId: 'dev-003',
-        target: 'cpe-serial-789',
-        operation: 'GET_PARAMETER_VALUES',
-        action: 'tr069GetParameterValues',
-        parameters: { parameters: ['Device.DeviceInfo.ModelName'] },
-        status: 'failed',
-        duration: 1200,
-        user: 'operator@example.com',
-        executedAt: new Date(Date.now() - 7200000).toISOString(),
-        error: 'Timeout waiting for device response',
-        isFavorite: false,
-      },
-      {
-        id: 'hist-4',
-        protocol: 'tr369',
-        deviceId: 'dev-004',
-        target: 'usp-endpoint-456',
-        operation: 'GET',
-        action: 'tr369Get',
-        parameters: { paths: ['Device.LocalAgent.'] },
-        status: 'success',
-        duration: 890,
-        user: 'admin@example.com',
-        executedAt: new Date(Date.now() - 10800000).toISOString(),
-        response: { results: [{ path: 'Device.LocalAgent.', value: {} }] },
-        isFavorite: true,
-      },
-    ];
+    // Get from localStorage
+    const localHistory = getLocalHistoryRecords();
 
     // Apply filters
-    let filtered = [...mockItems];
+    let filtered = [...localHistory];
     if (protocol) filtered = filtered.filter(q => q.protocol === protocol);
     if (status) filtered = filtered.filter(q => q.status === status);
+    if (deviceId) filtered = filtered.filter(q => q.deviceId === deviceId || q.target === deviceId);
     if (search) {
       const s = search.toLowerCase();
       filtered = filtered.filter(q => 
         q.target?.toLowerCase().includes(s) ||
         q.operation?.toLowerCase().includes(s) ||
-        q.deviceId?.toLowerCase().includes(s)
+        q.deviceId?.toLowerCase().includes(s) ||
+        q.action?.toLowerCase().includes(s)
       );
+    }
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom);
+      filtered = filtered.filter(q => new Date(q.executedAt) >= fromDate);
+    }
+    if (dateTo) {
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999); // End of day
+      filtered = filtered.filter(q => new Date(q.executedAt) <= toDate);
+    }
+
+    // Sort
+    if (sort) {
+      const [field, order] = sort.split(':');
+      filtered.sort((a, b) => {
+        const aVal = a[field];
+        const bVal = b[field];
+        if (order === 'asc') {
+          return aVal > bVal ? 1 : -1;
+        } else {
+          return aVal < bVal ? 1 : -1;
+        }
+      });
     }
 
     return {
@@ -298,4 +241,21 @@ export async function rerunQuery(queryId) {
   }
   const { data } = await api.post(`/queries/${queryId}/rerun`);
   return data;
+}
+
+// PUBLIC_INTERFACE
+export function addLocalQueryRecord(record) {
+  /**
+   * Add a query record to local storage (used by mock fallback)
+   * This helper ensures schema consistency with QueryHistory expectations
+   * @param {Object} record - Query record to add
+   */
+  try {
+    const existing = JSON.parse(localStorage.getItem('dmgr.history') || '[]');
+    existing.unshift(record);
+    const trimmed = existing.slice(0, 100);
+    localStorage.setItem('dmgr.history', JSON.stringify(trimmed));
+  } catch (err) {
+    console.error('Failed to add local query record:', err);
+  }
 }
