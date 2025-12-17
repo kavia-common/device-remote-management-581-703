@@ -41,8 +41,12 @@ import LoginPage from './pages/Login';
 import DashboardPage from './pages/Dashboard';
 import DevicesPage from './pages/Devices';
 import SettingsPage from './pages/Settings';
-import ProtocolPlaceholderPage from './pages/ProtocolPlaceholder';
 import QueryHistoryPage from './pages/QueryHistory';
+import HelpPage from './pages/Help';
+import SNMPPage from './pages/protocols/SNMPPage';
+import WebPAPage from './pages/protocols/WebPAPage';
+import TR069Page from './pages/protocols/TR069Page';
+import TR369Page from './pages/protocols/TR369Page';
 import ErrorBoundary from './components/ErrorBoundary';
 import { hideSnackbar, selectSnackbar } from './store/uiSlice';
 import { selectIsAuthenticated, logout, selectUser } from './store/authSlice';
@@ -56,7 +60,7 @@ function NavList({ onNavigate }) {
     { label: 'Devices', to: '/devices', icon: <DevicesIcon /> },
     { label: 'SNMP', to: '/protocols/snmp', icon: <LanIcon /> },
     { label: 'WebPA', to: '/protocols/webpa', icon: <RouterIcon /> },
-    { label: 'TR-069', to: '/protocols/tr69', icon: <HubIcon /> },
+    { label: 'TR-069', to: '/protocols/tr069', icon: <HubIcon /> },
     { label: 'TR-369/USP', to: '/protocols/tr369', icon: <HubIcon /> },
     { label: 'History', to: '/history', icon: <HistoryIcon /> },
     { label: 'Settings', to: '/settings', icon: <SettingsIcon /> },
@@ -169,10 +173,13 @@ function AppShell() {
           <Routes>
             <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="/devices" element={<ProtectedRoute><DevicesPage /></ProtectedRoute>} />
-            <Route path="/protocols/:name" element={<ProtectedRoute><ProtocolPlaceholderPage /></ProtectedRoute>} />
+            <Route path="/protocols/snmp" element={<ProtectedRoute><SNMPPage /></ProtectedRoute>} />
+            <Route path="/protocols/webpa" element={<ProtectedRoute><WebPAPage /></ProtectedRoute>} />
+            <Route path="/protocols/tr069" element={<ProtectedRoute><TR069Page /></ProtectedRoute>} />
+            <Route path="/protocols/tr369" element={<ProtectedRoute><TR369Page /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute><QueryHistoryPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-            <Route path="/help" element={<ProtocolPlaceholderPage title="Help" description="Documentation coming soon." />} />
+            <Route path="/help" element={<ProtectedRoute><HelpPage /></ProtectedRoute>} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
