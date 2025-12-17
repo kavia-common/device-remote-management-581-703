@@ -27,13 +27,14 @@ import { mockLogin, mockHealth, mockListDevices } from './mockApi';
 
 /** Endpoints registry to prepare for real backend integration. */
 export const endpoints = {
-  login: '/auth/login',
+  login: process.env.REACT_APP_AUTH_LOGIN_PATH || '/auth/login',
   devices: '/devices',
   health: process.env.REACT_APP_HEALTHCHECK_PATH || '/health',
 };
 
 // PUBLIC_INTERFACE
 export async function apiLogin({ email, password }) {
+  // If no real API, use mock
   if (isMockMode()) {
     return mockLogin({ email, password });
   }

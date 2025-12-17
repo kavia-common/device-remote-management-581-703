@@ -5,8 +5,12 @@ import App from './App';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { setStore } from './api/storeRef';
 import store from './store';
+import { initAuthFromStorage } from './store/authSlice';
 
 setStore(store);
+
+// Initialize auth from localStorage before render
+store.dispatch(initAuthFromStorage());
 
 const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 const theme = createTheme({

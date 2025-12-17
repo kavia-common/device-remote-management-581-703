@@ -19,6 +19,9 @@ import {
   Alert,
   Button,
   Divider,
+  Menu,
+  MenuItem,
+  Avatar,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import DevicesIcon from '@mui/icons-material/Devices';
@@ -38,7 +41,7 @@ import SettingsPage from './pages/Settings';
 import ProtocolPlaceholderPage from './pages/ProtocolPlaceholder';
 import ErrorBoundary from './components/ErrorBoundary';
 import { hideSnackbar, selectSnackbar } from './store/uiSlice';
-import { selectIsAuthenticated, logout } from './store/authSlice';
+import { selectIsAuthenticated, logout, selectUser } from './store/authSlice';
 
 const drawerWidth = 240;
 
@@ -68,10 +71,15 @@ function NavList({ onNavigate }) {
 function AppShell() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const isAuthed = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectUser);
   const dispatch = useDispatch();
   const snackbar = useSelector(selectSnackbar);
+  const [anchorEl, setAnchorEl] = React.useState(null);
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
+  const openMenu = (e) => setAnchorEl(e.currentTarget);
+  const closeMenu = () => setAnchorEl(null);
+  const doLogout = () => { closeMenu(); dispatch(logout()); };
 
   const drawer = (
     <div>
@@ -100,9 +108,15 @@ function AppShell() {
             Device Remote Management
           </Typography>
           {isAuthed ? (
-            <Button color="inherit" startIcon={<LockIcon />} onClick={() => dispatch(logout())}>
-              Logout
-            </Button>
+            <>
+              <IconButton color="inherit" onClick={openMenu} size="small" aria-label="User menu">
+                <Avatar sx={{ width: 32, height: 32 }}>{(user?.email || 'U').slice(0,1).toUpperCase()}</Avatar>
+              </IconButton>
+              <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={closeMenu}>
+                <MenuItem disabled>{user?.email || 'User'}</MenuItem>
+                <MenuItem onClick={doLogout}><LockIcon fontSize="small" style={{ marginRight: 8 }} /> Logout</MenuItem>
+              </Menu>
+            </>
           ) : (
             <Button color="inherit" component={Link} to="/login" startIcon={<LockIcon />}>
               Login
