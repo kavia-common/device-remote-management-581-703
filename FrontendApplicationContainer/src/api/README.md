@@ -1,24 +1,230 @@
-# API Layer (Frontend)
+# API Layer Documentation
 
-- Base URL is taken from REACT_APP_API_BASE or REACT_APP_BACKEND_URL.
-- If both are empty, the app runs in mock mode and uses local mock implementations.
-- JWT (when logged in) is attached via Authorization: Bearer <token> header on real API requests.
-- Health endpoint path can be customized with REACT_APP_HEALTHCHECK_PATH (default: /health).
+## Overview
 
-Authentication
-- Login endpoint: REACT_APP_AUTH_LOGIN_PATH (default: /auth/login)
-- Refresh endpoint (optional): REACT_APP_AUTH_REFRESH_PATH (if not set, 401 triggers logout)
-- On successful login, the app persists access token (and optional refresh token) in localStorage.
+The API layer provides a unified interface for all backend communications, with automatic fallback to mock mode when no backend is configured. This ensures the frontend can be developed and tested independently.
 
-Switching to real backend:
-1. Set REACT_APP_API_BASE (or REACT_APP_BACKEND_URL) in your environment.
-2. Ensure backend exposes POST {REACT_APP_AUTH_LOGIN_PATH} returning JSON with:
-   - access_token or token: string (JWT)
-   - refresh_token: string (optional)
-   - user: object (optional)
-3. If using refresh, set REACT_APP_AUTH_REFRESH_PATH to the refresh endpoint (expects {refresh_token} in body).
-4. Ensure CORS is enabled on the backend for the frontend origin.
+## Architecture
 
-Notes:
-- Only the login flow switches to real API by default when REACT_APP_API_BASE is set. Other endpoints continue to support mock mode when API base is not set.
-- Protected routes redirect unauthenticated users to /login.
+### Base Configuration
+
+- **Base URL**: Configured via `REACT_APP_API_BASE` or `REACT_APP_BACKEND_URL` environment variables
+- **Mock Mode**: Automatically activated when both env vars are empty or unset
+- **Authentication**: JWT tokens attached via `Authorization: Bearer <token>` header
+- **Error Handling**: Centralized in `client.js` with automatic 401 refresh attempts
+
+### Modules
+
+#### 1. **client.js**
+Core axios instance with request/response interceptors
+- Auto-attaches JWT from Redux store
+- Handles 401 responses with token refresh logic
+- Queues requests during refresh
+- Dispatches errors to Redux UI slice
+
+#### 2. **auth.js**
+Authentication operations
+- `loginWithPassword({ email, password })` - Login
+- `refreshAccessToken()` - Token refresh
+- `loadPersistedAuth()` - Load from localStorage
+- `persistAuth()` - Save to localStorage
+- `clearPersistedAuth()` - Clear tokens
+
+#### 3. **devices.js**
+Device management operations
+- `listDevices({ page, pageSize, sort, filter })` - Paginated device list
+- `getDeviceById(deviceId)` - Device details
+- `createDevice(deviceData)` - Create device
+- `updateDevice(deviceId, deviceData)` - Update device
+- `deleteDevice(deviceId)` - Delete device
+
+#### 4. **protocols/snmp.js**
+SNMP protocol operations
+- `snmpGet({ deviceId, oid, version, community })` - SNMP GET
+- `snmpSet({ deviceId, oid, value, valueType, version, community })` - SNMP SET
+- `snmpWalk({ deviceId, oid, version, community, maxRepetitions })` - SNMP WALK
+- `snmpBulkGet({ deviceId, oids, version, community })` - SNMP BULK GET
+
+#### 5. **protocols/webpa.js**
+WebPA protocol operations
+- `webpaGetParameter({ deviceId, parameter })` - Get parameter value
+- `webpaSetParameter({ deviceId, parameter, value, dataType })` - Set parameter
+- `webpaGetAttributes({ deviceId, parameter })` - Get parameter attributes
+- `webpaSetAttributes({ deviceId, parameter, attributes })` - Set attributes
+- `webpaGetParameterNames({ deviceId, path, nextLevel })` - List parameters
+
+#### 6. **protocols/tr069.js**
+TR-069/ACS protocol operations
+- `tr069GetParameterValues({ deviceId, parameters })` - Get parameters
+- `tr069SetParameterValues({ deviceId, parameters })` - Set parameters
+- `tr069GetParameterNames({ deviceId, path, nextLevel })` - List parameters
+- `tr069Reboot({ deviceId })` - Reboot device
+- `tr069FactoryReset({ deviceId })` - Factory reset
+- `tr069Download({ deviceId, fileType, url, username, password })` - Firmware/config download
+- `tr069GetTaskStatus({ taskId })` - Check async task status
+
+#### 7. **protocols/tr369.js**
+TR-369/USP protocol operations
+- `tr369Get({ deviceId, paths })` - GET operation
+- `tr369Set({ deviceId, parameters })` - SET operation
+- `tr369Add({ deviceId, path, parameters })` - ADD object instance
+- `tr369Delete({ deviceId, paths })` - DELETE object instance
+- `tr369Operate({ deviceId, command, commandKey, inputArgs })` - Execute command
+- `tr369GetSupportedDM({ deviceId, paths, firstLevelOnly })` - Get data model info
+- `tr369GetInstances({ deviceId, path, firstLevelOnly })` - Get instances
+
+#### 8. **configuration.js**
+Configuration management
+- `uploadMIB({ file, deviceId, description })` - Upload MIB file
+- `listMIBs({ page, pageSize })` - List MIBs
+- `deleteMIB(mibId)` - Delete MIB
+- `getParameterMetadata({ protocol, parameter })` - Get param metadata
+- `saveConfigurationTemplate({ name, deviceId, protocol, parameters })` - Save template
+- `listConfigurationTemplates({ page, pageSize })` - List templates
+
+#### 9. **queries.js**
+Query management
+- `saveQuery({ name, protocol, deviceId, parameters, isFavorite })` - Save query
+- `listQueries({ page, pageSize, favorites })` - List saved queries
+- `getQueryById(queryId)` - Get query details
+- `deleteQuery(queryId)` - Delete query
+- `toggleFavorite(queryId, isFavorite)` - Toggle favorite
+- `getQueryHistory({ page, pageSize, protocol, deviceId })` - Query history
+
+#### 10. **exports.js**
+Export operations
+- `exportResults({ format, data, filename })` - Export results (CSV/JSON/XML)
+- `getExportHistory({ page, pageSize })` - Export history
+- `scheduleExport({ format, query, schedule, recipients })` - Schedule periodic exports
+
+#### 11. **mockApi.js**
+Mock implementations for development
+- All mock functions return realistic data with delays
+- Auto-used when `REACT_APP_API_BASE` is not set
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Required for real backend
+REACT_APP_API_BASE=https://api.example.com/api/v1
+
+# Or alternative
+REACT_APP_BACKEND_URL=https://api.example.com/api/v1
+
+# Auth endpoints (optional, have defaults)
+REACT_APP_AUTH_LOGIN_PATH=/auth/login
+REACT_APP_AUTH_REFRESH_PATH=/auth/refresh
+
+# Health check (optional, default: /health)
+REACT_APP_HEALTHCHECK_PATH=/healthz
+```
+
+### Switching Between Real and Mock
+
+1. **Mock Mode** (default for development):
+   - Leave `REACT_APP_API_BASE` empty or unset
+   - All API calls use local mock implementations
+   - No backend required
+
+2. **Real Backend**:
+   - Set `REACT_APP_API_BASE=https://your-backend-url`
+   - Ensure backend CORS allows frontend origin
+   - Backend must implement expected endpoints (see OpenAPI spec)
+
+## Backend Requirements
+
+When connecting to a real backend, ensure:
+
+1. **Authentication**:
+   - `POST /auth/login` accepts `{email, password}`
+   - Returns `{access_token|token, refresh_token?, user?}`
+   - JWT format for access_token
+
+2. **Token Refresh** (optional but recommended):
+   - `POST /auth/refresh` accepts `{refresh_token}`
+   - Returns `{access_token|token, refresh_token?}`
+
+3. **CORS**:
+   - Allow frontend origin
+   - Allow credentials
+   - Expose auth headers if needed
+
+4. **Endpoints**:
+   - Follow REST conventions
+   - Return consistent error format (see OpenAPI spec)
+   - Support pagination with `page`, `pageSize` params
+   - Return `{page, pageSize, totalPages, totalItems, items}` for lists
+
+## Error Handling
+
+All API errors are:
+1. Caught by axios interceptor
+2. Formatted to consistent structure
+3. Displayed via Redux snackbar
+4. Returned as rejected promises
+
+Error format:
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable message",
+    "details": ["detail1", "detail2"],
+    "timestamp": "2024-01-01T00:00:00Z",
+    "path": "/api/endpoint"
+  }
+}
+```
+
+## Usage Examples
+
+### In Components
+
+```javascript
+import { listDevices, snmpGet } from '../api';
+import { useQuery } from 'react-query';
+
+// Using React Query
+const { data, isLoading } = useQuery(
+  ['devices', page],
+  () => listDevices({ page, pageSize: 10 })
+);
+
+// Direct usage
+const handleSnmpQuery = async () => {
+  try {
+    const result = await snmpGet({
+      deviceId: 'dev-123',
+      oid: '1.3.6.1.2.1.1.1.0',
+      version: 'v2c',
+      community: 'public'
+    });
+    console.log('SNMP result:', result);
+  } catch (err) {
+    // Error already shown via snackbar
+    console.error(err);
+  }
+};
+```
+
+### Type Safety
+
+All functions include JSDoc comments for IDE autocomplete and type checking.
+
+## Testing
+
+Mock mode allows full frontend testing without backend:
+- Predictable responses
+- Configurable delays
+- Realistic data structures
+- Edge cases (errors, empty results)
+
+## Future Enhancements
+
+- WebSocket support for real-time updates
+- Request caching layer
+- Retry logic for failed requests
+- Request deduplication
+- Optimistic updates

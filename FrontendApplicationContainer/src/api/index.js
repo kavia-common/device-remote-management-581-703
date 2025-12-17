@@ -2,6 +2,23 @@ import api, { isMockMode, getApiBase } from './client';
 import { mockLogin, mockHealth, mockListDevices } from './mockApi';
 
 /**
+ * Main API index - exports all API modules and functions
+ */
+
+// Re-export client utilities
+export { isMockMode, getApiBase };
+
+// Import and re-export all API modules
+export * from './devices';
+export * from './protocols/snmp';
+export * from './protocols/webpa';
+export * from './protocols/tr069';
+export * from './protocols/tr369';
+export * from './configuration';
+export * from './queries';
+export * from './exports';
+
+/**
  * Types (JSDoc)
  * 
  * @typedef {Object} ErrorItem
@@ -25,16 +42,42 @@ import { mockLogin, mockHealth, mockListDevices } from './mockApi';
  * @property {boolean} [hasPrevious]
  */
 
-/** Endpoints registry to prepare for real backend integration. */
+/** Endpoints registry */
 export const endpoints = {
+  // Auth
   login: process.env.REACT_APP_AUTH_LOGIN_PATH || '/auth/login',
-  devices: '/devices',
+  refresh: process.env.REACT_APP_AUTH_REFRESH_PATH || '/auth/refresh',
+  
+  // Core
   health: process.env.REACT_APP_HEALTHCHECK_PATH || '/health',
+  
+  // Devices
+  devices: '/devices',
+  
+  // Protocols
+  snmp: '/protocols/snmp',
+  webpa: '/protocols/webpa',
+  tr069: '/protocols/tr069',
+  tr369: '/protocols/tr369',
+  
+  // Configuration
+  configuration: '/configuration',
+  mib: '/configuration/mib',
+  templates: '/configuration/templates',
+  
+  // Queries
+  queries: '/queries',
+  queryHistory: '/queries/history',
+  
+  // Exports
+  exports: '/exports',
 };
 
 // PUBLIC_INTERFACE
 export async function apiLogin({ email, password }) {
-  // If no real API, use mock
+  /**
+   * Login endpoint (kept for backward compatibility)
+   */
   if (isMockMode()) {
     return mockLogin({ email, password });
   }
@@ -44,6 +87,9 @@ export async function apiLogin({ email, password }) {
 
 // PUBLIC_INTERFACE
 export async function apiHealth() {
+  /**
+   * Health check endpoint
+   */
   if (isMockMode()) {
     return mockHealth();
   }
@@ -53,6 +99,9 @@ export async function apiHealth() {
 
 // PUBLIC_INTERFACE
 export async function apiListDevices({ page = 1, pageSize = 10, sort } = {}) {
+  /**
+   * List devices endpoint (kept for backward compatibility)
+   */
   if (isMockMode()) {
     return mockListDevices({ page, pageSize, sort });
   }
@@ -62,5 +111,8 @@ export async function apiListDevices({ page = 1, pageSize = 10, sort } = {}) {
 
 // PUBLIC_INTERFACE
 export function currentApiBase() {
+  /**
+   * Get current API base URL
+   */
   return getApiBase();
 }
