@@ -83,13 +83,40 @@ Configuration management
 - `listConfigurationTemplates({ page, pageSize })` - List templates
 
 #### 9. **queries.js**
-Query management
+Query management and history
 - `saveQuery({ name, protocol, deviceId, parameters, isFavorite })` - Save query
 - `listQueries({ page, pageSize, favorites })` - List saved queries
 - `getQueryById(queryId)` - Get query details
 - `deleteQuery(queryId)` - Delete query
 - `toggleFavorite(queryId, isFavorite)` - Toggle favorite
-- `getQueryHistory({ page, pageSize, protocol, deviceId })` - Query history
+- `getQueryHistory({ page, pageSize, protocol, deviceId, status, search, dateFrom, dateTo, sort })` - Query history with filters
+- `rerunQuery(queryId)` - Rerun a previous query
+
+**Query History Endpoints:**
+- `GET /queries/history` - Get paginated query execution history
+  - Query params: `page`, `pageSize`, `protocol`, `deviceId`, `status`, `search`, `dateFrom`, `dateTo`, `sort`
+  - Returns: `{ page, pageSize, totalPages, totalItems, items: [...] }`
+  - Each item includes: `id`, `protocol`, `deviceId`, `target`, `operation`, `action`, `parameters`, `status`, `duration`, `user`, `executedAt`, `response`, `error`, `isFavorite`
+
+- `GET /queries/:id` - Get specific query details
+  - Returns full query object with request/response payloads
+
+- `POST /queries/:id/rerun` - Rerun a query with same parameters
+  - Returns: `{ success, queryId, status, message }`
+
+- `PATCH /queries/:id/favorite` or `POST /favorites` - Toggle favorite status
+  - Body: `{ isFavorite: true/false }`
+  - Returns: `{ success, queryId, isFavorite }`
+
+- `DELETE /favorites/:id` - Remove from favorites (alternative endpoint)
+  - Returns: `{ success }`
+
+**Configuration Notes:**
+- All query endpoints support mock fallback when `REACT_APP_API_BASE` is not set
+- Mock mode provides realistic data with multiple protocols (SNMP, WebPA, TR-069, TR-369)
+- Filters work in both mock and real modes
+- URL query parameters are persisted for shareable views
+- Client-side table state (page, pageSize, sort, filters) persisted in URL for deep linking
 
 #### 10. **exports.js**
 Export operations

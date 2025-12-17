@@ -32,6 +32,7 @@ import LanIcon from '@mui/icons-material/Lan';
 import RouterIcon from '@mui/icons-material/Router';
 import HubIcon from '@mui/icons-material/Hub';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import HistoryIcon from '@mui/icons-material/History';
 import MenuIcon from '@mui/icons-material/Menu';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
@@ -41,6 +42,7 @@ import DashboardPage from './pages/Dashboard';
 import DevicesPage from './pages/Devices';
 import SettingsPage from './pages/Settings';
 import ProtocolPlaceholderPage from './pages/ProtocolPlaceholder';
+import QueryHistoryPage from './pages/QueryHistory';
 import ErrorBoundary from './components/ErrorBoundary';
 import { hideSnackbar, selectSnackbar } from './store/uiSlice';
 import { selectIsAuthenticated, logout, selectUser } from './store/authSlice';
@@ -56,6 +58,7 @@ function NavList({ onNavigate }) {
     { label: 'WebPA', to: '/protocols/webpa', icon: <RouterIcon /> },
     { label: 'TR-069', to: '/protocols/tr69', icon: <HubIcon /> },
     { label: 'TR-369/USP', to: '/protocols/tr369', icon: <HubIcon /> },
+    { label: 'History', to: '/history', icon: <HistoryIcon /> },
     { label: 'Settings', to: '/settings', icon: <SettingsIcon /> },
     { label: 'Help', to: '/help', icon: <HelpOutlineIcon /> },
   ];
@@ -167,6 +170,7 @@ function AppShell() {
             <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="/devices" element={<ProtectedRoute><DevicesPage /></ProtectedRoute>} />
             <Route path="/protocols/:name" element={<ProtectedRoute><ProtocolPlaceholderPage /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute><QueryHistoryPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/help" element={<ProtocolPlaceholderPage title="Help" description="Documentation coming soon." />} />
             <Route path="/login" element={<LoginPage />} />
