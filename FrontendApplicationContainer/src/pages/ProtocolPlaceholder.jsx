@@ -409,9 +409,9 @@ function ProtocolPlaceholderPage({ title, description }) {
   };
 
   return (
-    <>
-      <Typography variant="h4" gutterBottom>{derivedTitle}</Typography>
-      <Paper sx={{ p: 2, mb: 2 }}>
+    <Box>
+      <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>{derivedTitle}</Typography>
+      <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
         {renderOperations()}
       </Paper>
 
@@ -429,7 +429,7 @@ function ProtocolPlaceholderPage({ title, description }) {
       )}
 
       {result && (
-        <Paper sx={{ p: 2, mt: 2 }}>
+        <Paper elevation={2} sx={{ p: 3, mt: 3 }}>
           <Typography variant="h6" gutterBottom>Result</Typography>
           <Box
             component="pre"
@@ -446,7 +446,7 @@ function ProtocolPlaceholderPage({ title, description }) {
           </Box>
         </Paper>
       )}
-    </>
+    </Box>
   );
 }
 

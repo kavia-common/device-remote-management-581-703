@@ -46,16 +46,16 @@ function SettingsPage() {
   const apiBase = currentApiBase();
 
   return (
-    <>
-      <Typography variant="h4" gutterBottom>Settings</Typography>
+    <Box>
+      <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>Settings</Typography>
 
       {mockModeActive && (
-        <Alert severity="info" sx={{ mb: 2 }}>
+        <Alert severity="info" sx={{ mb: 3 }}>
           Mock mode is active. Set REACT_APP_API_BASE to connect to a real backend.
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>Environment Configuration</Typography>
         <List dense>
           {Object.entries(envValues).map(([k, v]) => (
@@ -66,7 +66,7 @@ function SettingsPage() {
         </List>
       </Paper>
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>API Connectivity</Typography>
         <Box mb={2}>
           <Typography variant="body2" gutterBottom>
@@ -108,7 +108,7 @@ function SettingsPage() {
         )}
       </Paper>
 
-      <Paper sx={{ p: 2 }}>
+      <Paper elevation={2} sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>API Endpoints</Typography>
         <Typography variant="body2" color="text.secondary">
           All endpoints are relative to the API base URL. When mock mode is active, operations use local mock implementations.
@@ -124,7 +124,7 @@ function SettingsPage() {
           <ListItem><ListItemText primary="/exports" secondary="Result export operations" /></ListItem>
         </List>
       </Paper>
-    </>
+    </Box>
   );
 }
 

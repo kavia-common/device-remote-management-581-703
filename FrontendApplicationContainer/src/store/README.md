@@ -4,3 +4,4 @@
 - Slices:
   - authSlice: loginSuccess, logout, selectors selectIsAuthenticated, selectToken, selectUser
   - uiSlice: showSnackbar, hideSnackbar, selector selectSnackbar
+  - themeSlice: toggleTheme, setThemeMode, selector selectThemeMode

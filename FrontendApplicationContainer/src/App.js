@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { Provider, useSelector, useDispatch } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import {
   AppBar,
@@ -22,6 +22,7 @@ import {
   Menu,
   MenuItem,
   Avatar,
+  Tooltip,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import DevicesIcon from '@mui/icons-material/Devices';
@@ -32,8 +33,9 @@ import RouterIcon from '@mui/icons-material/Router';
 import HubIcon from '@mui/icons-material/Hub';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import MenuIcon from '@mui/icons-material/Menu';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 import './App.css';
-import store from './store';
 import LoginPage from './pages/Login';
 import DashboardPage from './pages/Dashboard';
 import DevicesPage from './pages/Devices';
@@ -42,6 +44,7 @@ import ProtocolPlaceholderPage from './pages/ProtocolPlaceholder';
 import ErrorBoundary from './components/ErrorBoundary';
 import { hideSnackbar, selectSnackbar } from './store/uiSlice';
 import { selectIsAuthenticated, logout, selectUser } from './store/authSlice';
+import { toggleTheme, selectThemeMode } from './store/themeSlice';
 
 const drawerWidth = 240;
 
@@ -72,11 +75,13 @@ function AppShell() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const isAuthed = useSelector(selectIsAuthenticated);
   const user = useSelector(selectUser);
+  const themeMode = useSelector(selectThemeMode);
   const dispatch = useDispatch();
   const snackbar = useSelector(selectSnackbar);
   const [anchorEl, setAnchorEl] = React.useState(null);
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
+  const handleThemeToggle = () => dispatch(toggleTheme());
   const openMenu = (e) => setAnchorEl(e.currentTarget);
   const closeMenu = () => setAnchorEl(null);
   const doLogout = () => { closeMenu(); dispatch(logout()); };
@@ -107,9 +112,14 @@ function AppShell() {
           <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
             Device Remote Management
           </Typography>
+          <Tooltip title={`Switch to ${themeMode === 'light' ? 'dark' : 'light'} mode`}>
+            <IconButton color="inherit" onClick={handleThemeToggle} aria-label="Toggle theme">
+              {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+            </IconButton>
+          </Tooltip>
           {isAuthed ? (
             <>
-              <IconButton color="inherit" onClick={openMenu} size="small" aria-label="User menu">
+              <IconButton color="inherit" onClick={openMenu} size="small" aria-label="User menu" sx={{ ml: 1 }}>
                 <Avatar sx={{ width: 32, height: 32 }}>{(user?.email || 'U').slice(0,1).toUpperCase()}</Avatar>
               </IconButton>
               <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={closeMenu}>
@@ -193,15 +203,13 @@ const queryClient = new QueryClient();
 function App() {
   /** Root application with providers and error boundary. */
   return (
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <Router>
-          <ErrorBoundary>
-            <AppShell />
-          </ErrorBoundary>
-        </Router>
-      </QueryClientProvider>
-    </Provider>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <ErrorBoundary>
+          <AppShell />
+        </ErrorBoundary>
+      </Router>
+    </QueryClientProvider>
   );
 }
 

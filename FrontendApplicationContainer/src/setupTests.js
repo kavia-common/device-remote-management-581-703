@@ -6,8 +6,7 @@ import '@testing-library/jest-dom';
 
 // Mock axios to avoid ES module issues in tests
 jest.mock('axios', () => {
-  const mockAxios = {
-    create: jest.fn(() => mockAxios),
+  const mockAxiosInstance = {
     get: jest.fn(() => Promise.resolve({ data: {} })),
     post: jest.fn(() => Promise.resolve({ data: {} })),
     put: jest.fn(() => Promise.resolve({ data: {} })),
@@ -18,5 +17,19 @@ jest.mock('axios', () => {
       response: { use: jest.fn(), eject: jest.fn() },
     },
   };
+  
+  const mockAxios = {
+    create: jest.fn(() => mockAxiosInstance),
+    get: jest.fn(() => Promise.resolve({ data: {} })),
+    post: jest.fn(() => Promise.resolve({ data: {} })),
+    put: jest.fn(() => Promise.resolve({ data: {} })),
+    delete: jest.fn(() => Promise.resolve({ data: {} })),
+    patch: jest.fn(() => Promise.resolve({ data: {} })),
+    interceptors: {
+      request: { use: jest.fn(), eject: jest.fn() },
+      response: { use: jest.fn(), eject: jest.fn() },
+    },
+  };
+  
   return { default: mockAxios };
 });

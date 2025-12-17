@@ -56,8 +56,8 @@ function DevicesPage() {
   };
 
   return (
-    <>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+    <Box>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Typography variant="h4">Devices</Typography>
         <Box>
           <Tooltip title="Export CSV">
@@ -72,7 +72,7 @@ function DevicesPage() {
           </Tooltip>
         </Box>
       </Stack>
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} elevation={2}>
         <Table size="small" aria-label="devices table">
           <TableHead>
             <TableRow>
@@ -179,7 +179,7 @@ function DevicesPage() {
           <Button onClick={handleCloseDetails}>Close</Button>
         </DialogActions>
       </Dialog>
-    </>
+    </Box>
   );
 }
 
