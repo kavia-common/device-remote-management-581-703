@@ -3,7 +3,7 @@ import { store } from '../store/store';
 import { logout, refreshTokenAsync } from '../store/slices/authSlice';
 
 // Get API base URL from environment variables
-const API_BASE_URL = process.env.REACT_APP_API_BASE || process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_BASE || process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 // Create axios instance
 const api = axios.create({
@@ -14,13 +14,24 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and user ID
 api.interceptors.request.use(
   (config) => {
-    const token = store.getState().auth.token;
+    const state = store.getState();
+    const token = state.auth.token;
+    const user = state.auth.user;
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Add user ID header for multi-tenant support
+    if (user?.id || user?.username) {
+      config.headers['X-User-Id'] = user.id || user.username || 'default-user';
+    } else {
+      config.headers['X-User-Id'] = 'default-user';
+    }
+    
     return config;
   },
   (error) => {
@@ -92,19 +103,22 @@ export const healthApi = {
 // Device API endpoints
 export const deviceApi = {
   // PUBLIC_INTERFACE
-  getDevices: (params) => api.get('/devices', { params }),
+  getDevices: (params) => api.get('/api/v1/devices', { params }),
   
   // PUBLIC_INTERFACE
-  getDevice: (id) => api.get(`/devices/${id}`),
+  getDevice: (id) => api.get(`/api/v1/devices/${id}`),
   
   // PUBLIC_INTERFACE
-  createDevice: (data) => api.post('/devices', data),
+  createDevice: (data) => api.post('/api/v1/devices', data),
   
   // PUBLIC_INTERFACE
-  updateDevice: (id, data) => api.put(`/devices/${id}`, data),
+  updateDevice: (id, data) => api.put(`/api/v1/devices/${id}`, data),
   
   // PUBLIC_INTERFACE
-  deleteDevice: (id) => api.delete(`/devices/${id}`),
+  deleteDevice: (id) => api.delete(`/api/v1/devices/${id}`),
+  
+  // PUBLIC_INTERFACE
+  getDeviceStats: () => api.get('/api/v1/devices/stats'),
 };
 
 // Protocol API endpoints
