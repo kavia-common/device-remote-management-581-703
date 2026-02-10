@@ -1,20 +1,36 @@
 {
-  "name": "react-kavia",
-  "version": "0.1.0",
+  "name": "device-remote-management-frontend",
+  "version": "1.0.0",
   "private": true,
+  "description": "Frontend application for Device Remote Management platform",
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.7",
+    "@mui/material": "^7.3.7",
+    "@reduxjs/toolkit": "^2.11.2",
+    "@tanstack/react-query": "^5.90.20",
+    "axios": "^1.13.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-redux": "^9.2.0",
+    "react-router-dom": "^6.30.3",
     "react-scripts": "^5.0.1"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "test": "CI=true react-scripts test --watchAll=false",
+    "test:watch": "react-scripts test",
+    "eject": "react-scripts eject",
+    "lint": "eslint src/**/*.{js,jsx}",
+    "lint:fix": "eslint src/**/*.{js,jsx} --fix"
   },
   "eslintConfig": {
-    "extends": "react-app"
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
   },
   "browserslist": {
     "production": [
@@ -29,6 +45,10 @@
     ]
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^13.4.0", 
+    "@testing-library/user-event": "^14.4.3",
     "cross-env": "^7.0.3"
-  }
+  },
+  "proxy": "http://localhost:3001"
 }
